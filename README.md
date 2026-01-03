@@ -2,7 +2,7 @@
 
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
-Stop thinking about git commits. Just code, and let AI handle the rest.
+Stop wasting time on git commits. Code, save, done. AI handles the boring stuff.
 
 ## ⚠️ Warning: May Cause Horror in Senior Developers
 
