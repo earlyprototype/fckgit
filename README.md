@@ -19,7 +19,7 @@ This tool is only for cool kids:
 
 ## Features 
 
-- 🤖 **AI Does Your Commits** - Gemini write your commit messages so you have more time to focus on your prompt engineering course.
+- 🤖 **AI Does Your Commits** - Gemini write your commit messages so you have more time to focus on your Youtube prompt engineering course.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
@@ -104,7 +104,7 @@ We auto-delete them. You're welcome.
 Yeah, don't do that. Kill the extras with Task Manager.
 
 **Hit API rate limits?**  
-Free tier gives you 15/min. With our 30 second cooldown, you'd need to code pretty hard to hit it.
+Free tier gives you 15/min. With a 30 second cooldown, you'd need to code pretty hard to hit it.
 
 **Using this on a team repo?**  
 Stop. Use `--once` mode or your hackathon teammates will hate you.
