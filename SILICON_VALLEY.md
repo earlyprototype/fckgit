@@ -198,7 +198,7 @@ Just make sure you have:
 - Gemini API key set
 - Your AI assistant connected
 
-## Usage Examples
+## Usage Examples :)
 
 ### Example Session 1: Silicon Valley Commit
 
