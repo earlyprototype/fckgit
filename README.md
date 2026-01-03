@@ -93,6 +93,9 @@ See [MCP_SETUP.md](MCP_SETUP.md) for complete setup instructions for:
 **Available Tools:**
 
 Your AI assistant can now:
+- **BLASTOFF** - Launch full auto mode (`fckgit_blastoff`)
+- Check watch status (`fckgit_watch_status`)
+- Stop watch mode (`fckgit_stop_watch`)
 - Check git status (`fckgit_status`)
 - Generate commit messages (`fckgit_generate_message`)
 - Auto-commit with AI messages (`fckgit_commit`)
@@ -100,7 +103,7 @@ Your AI assistant can now:
 - Push to remote (`fckgit_push`)
 - Clean up lock files (`fckgit_cleanup_lock`)
 
-What could possibly go wrong?
+Just tell your AI "blastoff" and it'll start auto-committing everything. What could possibly go wrong?
 
 ## Setup (Takes 30 Seconds)
 

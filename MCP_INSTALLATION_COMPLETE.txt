@@ -35,25 +35,38 @@ Installation:
   test_mcp.py             - Setup verification script
 
 ================================================================================
-                            6 MCP TOOLS AVAILABLE
+                            9 MCP TOOLS AVAILABLE
 ================================================================================
 
-1. fckgit_status
+THE NUCLEAR OPTION:
+
+1. fckgit_blastoff
+   START FULL AUTOMATIC MODE - Launch fckgit watch mode (auto-commits + auto-pushes)
+   
+2. fckgit_watch_status
+   Check if fckgit watch mode is currently running
+   
+3. fckgit_stop_watch
+   Stop the running fckgit watch process
+
+MANUAL OPERATIONS:
+
+4. fckgit_status
    Get current git status and optionally the full diff
    
-2. fckgit_generate_message
+5. fckgit_generate_message
    Generate AI commit message without committing
    
-3. fckgit_commit
+6. fckgit_commit
    Auto-commit with AI-generated message (optional auto-push)
    
-4. fckgit_commit_with_message
+7. fckgit_commit_with_message
    Commit with a specific message (no AI)
    
-5. fckgit_push
+8. fckgit_push
    Push to remote (handles conflicts with auto-rebase)
    
-6. fckgit_cleanup_lock
+9. fckgit_cleanup_lock
    Clean up stale git lock files
 
 ================================================================================
@@ -107,6 +120,9 @@ Installation:
 6. Try It Out
    
    Ask your AI:
+   - "Blastoff!" (starts automatic watch mode)
+   - "Is fckgit watching?" (check if running)
+   - "Stop watching" (stops watch mode)
    - "What's the git status?"
    - "Commit these changes with an AI message"
    - "Generate a commit message for my changes"

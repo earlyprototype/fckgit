@@ -29,14 +29,17 @@ Your abomination now has an MCP server. AI assistants can now commit and push yo
 
 ## Available MCP Tools
 
-Your AI assistant can now use these 6 tools:
+Your AI assistant can now use these 9 tools:
 
-1. **fckgit_status** - Get git status and optionally the full diff
-2. **fckgit_generate_message** - Generate AI commit messages without committing
-3. **fckgit_commit** - Auto-commit with AI-generated message (optional auto-push)
-4. **fckgit_commit_with_message** - Commit with a specific message
-5. **fckgit_push** - Push to remote with automatic conflict resolution
-6. **fckgit_cleanup_lock** - Clean up stale git lock files
+1. **fckgit_blastoff** - THE NUCLEAR OPTION - Start full automatic watch mode
+2. **fckgit_watch_status** - Check if watch mode is running
+3. **fckgit_stop_watch** - Stop the watch mode process
+4. **fckgit_status** - Get git status and optionally the full diff
+5. **fckgit_generate_message** - Generate AI commit messages without committing
+6. **fckgit_commit** - Auto-commit with AI-generated message (optional auto-push)
+7. **fckgit_commit_with_message** - Commit with a specific message
+8. **fckgit_push** - Push to remote with automatic conflict resolution
+9. **fckgit_cleanup_lock** - Clean up stale git lock files
 
 ## Quick Start
 
@@ -93,6 +96,9 @@ Restart Cursor/Claude Desktop for the changes to take effect.
 ### 5. Try It Out
 
 Ask your AI assistant:
+- "Blastoff!" (starts automatic watch mode)
+- "Is fckgit watching?" (check status)
+- "Stop watching" (stops watch mode)
 - "What's the git status?"
 - "Commit these changes with an AI-generated message"
 - "Generate a commit message for my changes"
