@@ -1,6 +1,8 @@
 import subprocess
 import os
 import sys
+import argparse
+import time
 
 # Fix Windows console encoding for emojis
 if sys.platform == 'win32':
@@ -14,6 +16,13 @@ try:
 except ImportError:
     print("❌ google-generativeai not installed. Run: pip install google-generativeai")
     sys.exit(1)
+
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    WATCHDOG_AVAILABLE = True
+except ImportError:
+    WATCHDOG_AVAILABLE = False
 
 # Try to load .env file if python-dotenv is available
 try:
@@ -86,13 +95,116 @@ def push():
         return False
 
 
+class GitChangeHandler(FileSystemEventHandler):
+    """Handle file system events and trigger commits."""
+    
+    def __init__(self):
+        self.last_commit_time = 0
+        self.cooldown = 5  # seconds between commits
+        
+    def should_process(self, event):
+        """Check if we should process this event."""
+        # Ignore directories
+        if event.is_directory:
+            return False
+        
+        # Ignore .git folder changes
+        if '/.git/' in event.src_path.replace('\\', '/') or '\\.git\\' in event.src_path:
+            return False
+        
+        # Check cooldown
+        current_time = time.time()
+        if current_time - self.last_commit_time < self.cooldown:
+            return False
+        
+        return True
+    
+    def on_modified(self, event):
+        """Handle file modification events."""
+        if self.should_process(event):
+            self.process_changes()
+    
+    def on_created(self, event):
+        """Handle file creation events."""
+        if self.should_process(event):
+            self.process_changes()
+    
+    def on_deleted(self, event):
+        """Handle file deletion events."""
+        if self.should_process(event):
+            self.process_changes()
+    
+    def process_changes(self):
+        """Process git changes."""
+        self.last_commit_time = time.time()
+        
+        # Small delay to ensure file writes are complete
+        time.sleep(0.5)
+        
+        # Get diff
+        diff = get_staged_diff() or get_diff()
+        
+        if not diff.strip():
+            return
+        
+        print("\n" + "="*50)
+        print("🔍 Changes detected! Analyzing...")
+        message = generate_message(diff)
+        
+        if message:
+            if commit(message):
+                push()
+        print("="*50 + "\n")
+
+
+def watch_mode():
+    """Start watching for file changes."""
+    if not WATCHDOG_AVAILABLE:
+        print("❌ watchdog not installed. Run: pip install watchdog")
+        sys.exit(1)
+    
+    print("👀 Watching for changes... (Press Ctrl+C to stop)")
+    print("   Will auto-commit and push when files are saved.")
+    print()
+    
+    event_handler = GitChangeHandler()
+    observer = Observer()
+    observer.schedule(event_handler, ".", recursive=True)
+    observer.start()
+    
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n\n✓ Stopped watching.")
+        observer.stop()
+    observer.join()
+
+
 def main():
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+        description="Auto-commit with AI-generated messages using Gemini"
+    )
+    parser.add_argument(
+        "--watch", "-w",
+        action="store_true",
+        help="Watch for file changes and auto-commit"
+    )
+    args = parser.parse_args()
+    
     # Check if we're in a git repo
     result = subprocess.run(["git", "rev-parse", "--git-dir"], capture_output=True)
     if result.returncode != 0:
         print("❌ Not a git repository.")
         sys.exit(1)
     
+    # Watch mode
+    if args.watch:
+        watch_mode()
+        return
+    
+    # Normal mode: single commit
     # Get diff (prefer staged, fall back to unstaged)
     diff = get_staged_diff() or get_diff()
     

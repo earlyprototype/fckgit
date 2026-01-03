@@ -17,6 +17,8 @@ export GEMINI_API_KEY="your_key_here"
 
 ## Usage
 
+### Single Commit Mode
+
 ```bash
 # Make changes to your files, then:
 fckgit
@@ -27,6 +29,21 @@ The tool will:
 2. Generate a Conventional Commits message using Gemini
 3. Stage and commit all changes
 4. Push to remote repository
+
+### Watch Mode (Auto-commit on save)
+
+```bash
+# Start watching for file changes:
+fckgit --watch
+# or
+fckgit -w
+```
+
+In watch mode:
+- Monitors all files in your repository
+- Automatically commits and pushes when you save files
+- 5-second cooldown between commits
+- Press `Ctrl+C` to stop watching
 
 ## Requirements
 
