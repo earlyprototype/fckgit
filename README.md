@@ -69,26 +69,18 @@ It literally just works:
 - 5 second cooldown so you don't spam
 - `Ctrl+C` when you're done being productive
 
-**Example output:**
+**What you'll see:**
 ```
-==================================================
-👀 fckgit - Auto-commit watcher started
-   Repository: my-project
-   Branch: main
-   Started: 2026-01-03 14:30:00
-   Press Ctrl+C to stop
-==================================================
+👀 fckgit watching | my-project | main branch
 
-==================================================
-🔍 Changes detected at 2026-01-03 14:32:15
-   Files: README.md, src/app.py
-   Analyzing with AI...
+🔍 Changes detected at 14:32:15
+   Files: README.md, app.py
 ✓ Committed: feat: Add new authentication feature
   [abc1234] at 14:32:17
-📤 Pushing to remote... (14:32:17)
-✓ Pushed to remote!
-==================================================
+📤 Pushed to remote!
 ```
+
+Clean. Simple. Gets out of your way.
 
 ### Single Commit Mode (For Control Freaks)
 
