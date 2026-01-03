@@ -184,12 +184,12 @@ def watch_mode():
 def main():
     # Parse arguments
     parser = argparse.ArgumentParser(
-        description="Auto-commit with AI-generated messages using Gemini"
+        description="Auto-commit with AI-generated messages using Gemini (watch mode by default)"
     )
     parser.add_argument(
-        "--watch", "-w",
+        "--once",
         action="store_true",
-        help="Watch for file changes and auto-commit"
+        help="Run once instead of watching for changes"
     )
     args = parser.parse_args()
     
@@ -199,27 +199,27 @@ def main():
         print("❌ Not a git repository.")
         sys.exit(1)
     
-    # Watch mode
-    if args.watch:
-        watch_mode()
+    # Single commit mode
+    if args.once:
+        # Get diff (prefer staged, fall back to unstaged)
+        diff = get_staged_diff() or get_diff()
+        
+        if not diff.strip():
+            print("No changes to commit.")
+            return
+        
+        print("🔍 Analyzing changes...")
+        message = generate_message(diff)
+        
+        if message:
+            if commit(message):
+                push()
+        else:
+            print("❌ Failed to generate commit message.")
         return
     
-    # Normal mode: single commit
-    # Get diff (prefer staged, fall back to unstaged)
-    diff = get_staged_diff() or get_diff()
-    
-    if not diff.strip():
-        print("No changes to commit.")
-        return
-    
-    print("🔍 Analyzing changes...")
-    message = generate_message(diff)
-    
-    if message:
-        if commit(message):
-            push()
-    else:
-        print("❌ Failed to generate commit message.")
+    # Default: Watch mode
+    watch_mode()
 
 
 if __name__ == "__main__":
