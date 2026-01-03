@@ -24,7 +24,7 @@ If you work on a team, for the love of git, **use `--once` mode** and review bef
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
-- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you inevitably need to debug.
+- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
 - 🌍 **Works Everywhere** - Windows, Mac, Linux. We don't discriminate.
 
 ## Installation (Obviously)
