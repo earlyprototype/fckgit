@@ -35,7 +35,24 @@ fckgit unlocks:
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
 - 🌍 **Works Everywhere** - Windows, iPad, Linux
 
-## Installation 
+## Installation (One Click - It's Safe!)
+
+**Option 1: Automated Install (Recommended)**
+
+```bash
+# Mac/Linux
+git clone https://github.com/earlyprototype/fckgit.git
+cd fckgit
+chmod +x install.sh
+./install.sh
+
+# Windows PowerShell
+git clone https://github.com/earlyprototype/fckgit.git
+cd fckgit
+.\install.ps1
+```
+
+**Option 2: Manual Install (If You Don't Trust Us)**
 
 ```bash
 git clone https://github.com/earlyprototype/fckgit.git
