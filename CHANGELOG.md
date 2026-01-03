@@ -3,16 +3,22 @@
 ## [0.2.0] - 2026-01-03
 
 ### Added
-- **`fckgit_silicon_valley`** - SILICON VALLEY MODE - Commit with FAANG-tier professional messages
-- **`fckgit_professionalize`** - Transform casual commit messages into enterprise-grade ones
+- **`--faang` flag** - SILICON VALLEY MODE for standalone tool (works with watch and --once modes)
+- **`fckgit_silicon_valley`** - MCP tool for FAANG-tier professional commits
+- **`fckgit_professionalize`** - MCP tool to transform casual messages to enterprise-grade
+- **`generate_silicon_valley_message()`** - Professional commit message generator
 - SILICON_VALLEY.md - Complete guide to professional commit mode
 - Buzzword-rich commit message generation
 - Technical rationale paragraphs in professional commits
 
 ### Changed
+- `generate_message()` now accepts `faang_mode` parameter
+- `watch_mode()` now accepts `faang_mode` parameter  
+- `GitChangeHandler` now accepts `faang_mode` in constructor
 - MCP tools expanded from 9 to 11
 - Enhanced AI prompts for enterprise-grade message generation
 - Updated all documentation to include Silicon Valley mode
+- Version bumped to 0.2.0
 
 ### Features
 - Makes commits sound like they're from a Staff Engineer at Google/Meta/Amazon
@@ -20,6 +26,7 @@
 - Includes technical rationale and impact analysis
 - Uses enterprise buzzwords: scalability, architecture, optimization, reliability
 - Perfect for when recruiters are watching your GitHub
+- Available in both standalone tool and MCP server
 
 ## [0.1.1] - 2026-01-03
 

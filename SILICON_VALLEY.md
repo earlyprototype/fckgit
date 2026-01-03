@@ -2,27 +2,6 @@
 
 Make your commits sound like you work at a FAANG company instead of coding in your pants at 3am.
 
-## Usage
-
-### Standalone Tool
-
-Use the `--faang` flag:
-
-```bash
-# Watch mode with Silicon Valley commits:
-python -m fckgit --faang
-
-# Single commit with professional message:
-python -m fckgit --once --faang
-```
-
-### MCP Server
-
-Tell your AI assistant:
-- "Commit in Silicon Valley mode"
-- "Make this commit sound professional"
-- "Professionalize this message: 'fixed stuff'"
-
 ## The Problem
 
 Your actual commits:
@@ -44,9 +23,21 @@ architectural best practices for distributed systems.
 
 ## The Solution
 
-Two new MCP tools that transform your embarrassing commits into impressive, buzzword-rich professional messages:
+### Standalone Tool: `--faang` Flag
 
-### 1. `fckgit_silicon_valley`
+Use Silicon Valley mode directly from the command line:
+
+```bash
+python -m fckgit --faang
+```
+
+This works in both watch mode and `--once` mode.
+
+### MCP Server: Two Professional Tools
+
+Transform your embarrassing commits into impressive, buzzword-rich professional messages:
+
+#### 1. `fckgit_silicon_valley`
 
 Commits your changes with an automatically generated FAANG-tier professional message.
 
@@ -79,9 +70,9 @@ the codebase. This change enhances developer experience and reduces onboarding
 friction, supporting our commitment to engineering excellence and scalability.
 ```
 
-### 2. `fckgit_professionalize`
+#### 2. `fckgit_professionalize` (MCP Only)
 
-Transforms a casual commit message into a professional one without committing.
+Transforms a casual commit message into a professional one without committing. This is MCP-only - the standalone tool always commits.
 
 **What it does:**
 - Takes your embarrassing message as input
@@ -89,7 +80,7 @@ Transforms a casual commit message into a professional one without committing.
 - Shows you both versions
 - Doesn't commit (just shows the transformation)
 
-**Usage:**
+**MCP usage:**
 
 Tell your AI:
 ```
