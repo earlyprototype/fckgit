@@ -2,7 +2,24 @@
 
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
-Stop thinking about git commits. Just code, save, and let AI handle the rest.
+Stop thinking about git commits. Just code, and let AI handle the rest.
+
+## ⚠️ Warning: May Cause Horror in Senior Developers
+
+This tool embodies everything your CS professor warned you about:
+- ❌ No carefully crafted commit messages
+- ❌ No logical commit boundaries  
+- ❌ No `git rebase -i` to clean up history
+- ❌ Commits literally everything you save
+- ✅ Maximum laziness achieved
+
+**"But muh git best practices!"** - Yeah, we know. This tool is for:
+- Solo projects where you're the only one reading the history
+- Prototypes where "ship it" > "perfect history"
+- Developers who'd rather write code than write commit messages
+- People honest enough to admit they `git commit -m "fix"` anyway
+
+If you work on a team, for the love of git, **use `--once` mode** and review before pushing. Or don't. We're not your parents.
 
 ## Features
 
