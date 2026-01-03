@@ -78,7 +78,7 @@ It literally just works:
 
 🔍 Changes detected at 14:32:15
    Files: README.md, app.py
-✓ Committed: feat: Add new authentication feature
+✓ Committed: feat: Add Revolu
   [abc1234] at 14:32:17
 📤 Pushed to remote!
 ```
