@@ -33,7 +33,7 @@ _AI to the core, with almost zero visibility._
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
-- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
+- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files for Product Managers.
 - 🌍 **Works Everywhere** - Windows, iPad, Linux
 
 ## fckgit unlocks:
