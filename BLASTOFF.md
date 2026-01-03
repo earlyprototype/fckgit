@@ -51,7 +51,7 @@ The AI will use `fckgit_stop_watch` to terminate the process.
 1. **Background Process**: Launches `python -m fckgit` as a detached background process
 2. **Process Tracking**: Uses psutil to track and manage the process
 3. **Per-Repository**: Only one watch process per repository at a time
-4. **Platform Compatible**: Works on Windows, M, and Linux
+4. **Platform Compatible**: Works on Windows, iPad, and Linux
 
 ## Technical Details
 
