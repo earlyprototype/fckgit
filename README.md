@@ -64,7 +64,7 @@ That's it. No docker containers, no kubernetes, no build scripts. Intern working
 
 ## Setup (Takes 30 Seconds)
 
-**Get your free API key:** [Google AI Studio](https://makersuite.google.com/app/apikey) (or pick from one of your 5 accounts)
+**Get your free API key:** [Google AI Studio](https://makersuite.google.com/app/apikey) (or pick from one of your 5 existing accounts)
 
 **Drop it in a .env file:**
 ```bash
