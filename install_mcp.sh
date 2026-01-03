@@ -19,15 +19,15 @@ echo "Found: $PYTHON_VERSION"
 
 # Install MCP
 echo ""
-echo "Installing MCP Python SDK..."
-pip3 install "mcp>=1.0.0"
+echo "Installing MCP Python SDK and dependencies..."
+pip3 install "mcp>=1.0.0" "psutil>=5.9.0"
 
 if [ $? -ne 0 ]; then
-    echo "Failed to install MCP"
+    echo "Failed to install MCP dependencies"
     exit 1
 fi
 
-echo "MCP installed successfully!"
+echo "MCP dependencies installed successfully!"
 
 # Test the setup
 echo ""

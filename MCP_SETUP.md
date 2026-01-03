@@ -100,6 +100,28 @@ Then your config becomes:
 
 Once configured, your AI assistant can use these tools:
 
+### `fckgit_blastoff` - THE NUCLEAR OPTION
+Launch fckgit in full automatic watch mode. This runs in the background and auto-commits + auto-pushes every change you make. Maximum automation, minimum accountability.
+
+**Example usage:**
+> "Start fckgit in automatic mode"
+> "Blastoff!"
+
+### `fckgit_watch_status`
+Check if fckgit watch mode is currently running.
+
+**Example usage:**
+> "Is fckgit watching?"
+
+### `fckgit_stop_watch`
+Stop the running fckgit watch process.
+
+**Parameters:**
+- `pid` (number, optional): Specific process ID to stop
+
+**Example usage:**
+> "Stop fckgit watch mode"
+
 ### `fckgit_status`
 Get current git status and optionally the full diff.
 

@@ -18,15 +18,15 @@ try {
 
 # Install MCP
 Write-Host ""
-Write-Host "Installing MCP Python SDK..." -ForegroundColor Yellow
-pip install "mcp>=1.0.0"
+Write-Host "Installing MCP Python SDK and dependencies..." -ForegroundColor Yellow
+pip install "mcp>=1.0.0" "psutil>=5.9.0"
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to install MCP" -ForegroundColor Red
+    Write-Host "Failed to install MCP dependencies" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "MCP installed successfully!" -ForegroundColor Green
+Write-Host "MCP dependencies installed successfully!" -ForegroundColor Green
 
 # Test the setup
 Write-Host ""
