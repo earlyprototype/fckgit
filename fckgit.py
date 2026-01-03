@@ -117,13 +117,34 @@ def push():
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"📤 Pushing to remote... ({timestamp})")
     result = subprocess.run(["git", "push"], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    
     if result.returncode == 0:
         print("✓ Pushed to remote!")
         return True
     else:
+        # Check if it's a rejected push (need to pull first)
         error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
-        print(f"❌ Push failed: {error_msg}")
-        return False
+        
+        if "rejected" in error_msg.lower() or "fetch first" in error_msg.lower():
+            print("🔄 Remote has new commits, pulling...")
+            pull_result = subprocess.run(["git", "pull", "--rebase"], capture_output=True, text=True, encoding='utf-8', errors='replace')
+            
+            if pull_result.returncode == 0:
+                print("✓ Pulled and rebased")
+                # Try pushing again
+                retry_result = subprocess.run(["git", "push"], capture_output=True, text=True, encoding='utf-8', errors='replace')
+                if retry_result.returncode == 0:
+                    print("✓ Pushed to remote!")
+                    return True
+                else:
+                    print(f"❌ Push failed after pull: {retry_result.stderr.strip()}")
+                    return False
+            else:
+                print(f"❌ Pull failed: {pull_result.stderr.strip()}")
+                return False
+        else:
+            print(f"❌ Push failed: {error_msg}")
+            return False
 
 
 class GitChangeHandler(FileSystemEventHandler):
