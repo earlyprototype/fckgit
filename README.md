@@ -2,7 +2,7 @@
 
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
-Stop wasting time on git commits. Code, save, done. AI handles the boring stuff.
+Stop wasting time on git commits. Code, save, done. AI handles the lame stuff.
 
 ## ⚠️ Warning: May Cause Horror in Senior Developers
 
@@ -11,7 +11,7 @@ This tool is only for cool kids:
 - ❌ No logical commit boundaries  
 - ❌ No `git rebase -i` to clean up history
 - ❌ Commits literally everything you touch
-- ✅ Maximum speed achieved
+- ✅ Maximum speed 
 
 **"But muh git features!"** - Shut up Nerd. This tool is for:
 - Extreme solo vibe-coders only🏄‍♂️ 
