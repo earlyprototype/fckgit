@@ -2,7 +2,7 @@
 
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
-Stop wasting time on git commits. Prompt - Accept - Publish. AI to the core with 
+Stop wasting time on git commits. Prompt - Accept - Publish. AI to the core with almost zero visibility
 
 ## ⚠️ Warning: May Cause Horror in Senior Developers
 
