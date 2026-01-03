@@ -25,7 +25,6 @@ AI to the core, with almost zero visibility.
 - ❌ Commits literally everything you touch
 - ✅ Maximum speed 
 
-**"But muh git features!"** - Nerd. 
 
 fckgit unlocks:
 - Up to 2x vibes 🏄‍♂️ 
@@ -158,7 +157,7 @@ Stop that immediately. `--once` mode only permitted during hackathons.
 - Git (don't ask)
 - [Free Gemini API key](https://makersuite.google.com/app/apikey)
 
-Dependencies install automatically. It just works™ (unlike you).
+Dependencies install automatically. It just works™ (unlike your scr).
 
 ## License
 
