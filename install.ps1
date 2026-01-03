@@ -1,6 +1,6 @@
 # fckgit - One Click Install (It's Safe!)
 
-Write-Host "🏄‍♂️ fckgit installer - EXTREME MODE ACTIVATED" -ForegroundColor Cyan
+Write-Host "fckgit installer - EXTREME MODE ACTIVATED" -ForegroundColor Cyan
 Write-Host ""
 
 # Check Python
