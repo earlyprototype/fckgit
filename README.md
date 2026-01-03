@@ -14,7 +14,7 @@ This tool is only for cool kids:
 - ✅ Maximum laziness achieved
 
 **"But muh git features!"** - Shut up Nerd. This tool is for:
-- Extreme solo vibe-riders only🏄‍♂️ 
+- Extreme solo vibe-coders only🏄‍♂️ 
 
 If you work on a team (you don't), for the love of Perplexity, **use `--once` mode** and review before pushing. 
 
