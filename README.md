@@ -69,7 +69,7 @@ pip install .
 
 That's it. No docker containers, no kubernetes, no viruses. 
 
-Intern working on MCP (available soon - stop asking).
+## MCP (available soon - stop asking).
 
 ## Setup (Takes 30 Seconds)
 
