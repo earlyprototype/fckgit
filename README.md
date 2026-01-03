@@ -6,7 +6,7 @@ Stop wasting time on git commits. Prompt - Accept - Publish. AI to the core, wit
 
 ## ⚠️ Warning
 
-This tool is only for cool kids:
+This tool is for cool kids only:
 - ❌ No carefully crafted commit messages
 - ❌ No logical commit boundaries  
 - ❌ No `git rebase -i` to clean up history
