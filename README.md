@@ -14,9 +14,7 @@ This tool is for cool kids only:
 - ✅ Maximum speed 
 
 **"But muh git features!"** - Shut up Nerd. This tool enables:
-- Extreme solo vibe-coders only🏄‍♂️ 
-
-
+- Extreme solo vibe-codering
 ## Features 
 
 - 🤖 **AI Does Your Commits** - Gemini write your commit messages so you have more time to focus on your Youtube prompt engineering course.
