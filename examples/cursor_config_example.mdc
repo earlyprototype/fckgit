@@ -1,0 +1,12 @@
+# Example Cursor MCP Configuration for fckgit
+# Add this to your Cursor MCP settings
+
+mcpServers:
+  fckgit:
+    command: python
+    args:
+      - "-m"
+      - "mcp_server"
+    cwd: "c:\\Users\\Fab2\\Desktop\\AI\\_tools\\_fckgit"
+    env:
+      GEMINI_API_KEY: "your_api_key_here"
