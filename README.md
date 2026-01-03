@@ -25,7 +25,7 @@ If you work on a team, for the love of git, **use `--once` mode** and review bef
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
-- 🌍 **Works Everywhere** - Windows, Mac, Linux. We don't discriminate.
+- 🌍 **Works Everywhere** - Windows, Mac, Linux, cafes We don't discriminate.
 
 ## Installation (Obviously)
 
