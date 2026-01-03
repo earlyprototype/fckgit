@@ -2,7 +2,9 @@ import asyncio
 import os
 import subprocess
 import sys
-from typing import Any
+import signal
+import psutil
+from typing import Any, Optional
 
 try:
     from google import genai
@@ -32,6 +34,9 @@ client = genai.Client(api_key=api_key)
 
 # Create MCP server
 server = Server("fckgit")
+
+# Track running watch processes
+_watch_processes: dict[str, subprocess.Popen] = {}
 
 
 def run_git_command(cmd: list[str]) -> tuple[str, str, int]:
@@ -149,6 +154,129 @@ def push_to_remote() -> tuple[bool, str]:
         return False, "Failed to pull for rebase"
     
     return False, f"Push failed: {error_msg}"
+
+
+def get_repo_path() -> str:
+    """Get the current repository root path."""
+    stdout, _, returncode = run_git_command(["git", "rev-parse", "--show-toplevel"])
+    if returncode == 0:
+        return stdout.strip()
+    return os.getcwd()
+
+
+def find_fckgit_processes() -> list[dict[str, Any]]:
+    """Find running fckgit watch processes."""
+    processes = []
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cwd']):
+            try:
+                cmdline = proc.info['cmdline'] or []
+                cmdline_str = ' '.join(cmdline)
+                
+                # Look for python -m fckgit or fckgit without --once
+                if ('python' in cmdline_str.lower() and 
+                    'fckgit' in cmdline_str and 
+                    '--once' not in cmdline_str):
+                    processes.append({
+                        'pid': proc.info['pid'],
+                        'cmdline': cmdline_str,
+                        'cwd': proc.info.get('cwd', 'unknown')
+                    })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception:
+        pass
+    return processes
+
+
+def start_watch_mode() -> tuple[bool, str, Optional[int]]:
+    """Start fckgit in watch mode as a background process."""
+    repo_path = get_repo_path()
+    
+    # Check if already running in this repo
+    existing = find_fckgit_processes()
+    for proc in existing:
+        if proc['cwd'] == repo_path:
+            return False, f"fckgit watch already running (PID: {proc['pid']})", proc['pid']
+    
+    # Start the process
+    try:
+        # Use CREATE_NEW_PROCESS_GROUP on Windows or start_new_session on Unix
+        if sys.platform == 'win32':
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+            process = subprocess.Popen(
+                [sys.executable, "-m", "fckgit"],
+                cwd=repo_path,
+                creationflags=creationflags,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL
+            )
+        else:
+            process = subprocess.Popen(
+                [sys.executable, "-m", "fckgit"],
+                cwd=repo_path,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL
+            )
+        
+        # Store the process
+        _watch_processes[repo_path] = process
+        
+        return True, f"fckgit watch mode started (PID: {process.pid})", process.pid
+    except Exception as e:
+        return False, f"Failed to start watch mode: {str(e)}", None
+
+
+def stop_watch_mode(pid: Optional[int] = None) -> tuple[bool, str]:
+    """Stop a running fckgit watch process."""
+    repo_path = get_repo_path()
+    
+    # If PID provided, try to kill that specific process
+    if pid:
+        try:
+            proc = psutil.Process(pid)
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except psutil.TimeoutExpired:
+                proc.kill()
+            return True, f"Stopped fckgit watch process (PID: {pid})"
+        except psutil.NoSuchProcess:
+            return False, f"Process {pid} not found"
+        except Exception as e:
+            return False, f"Failed to stop process {pid}: {str(e)}"
+    
+    # Otherwise, find and stop process for current repo
+    existing = find_fckgit_processes()
+    for proc_info in existing:
+        if proc_info['cwd'] == repo_path:
+            try:
+                proc = psutil.Process(proc_info['pid'])
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except psutil.TimeoutExpired:
+                    proc.kill()
+                return True, f"Stopped fckgit watch process (PID: {proc_info['pid']})"
+            except Exception as e:
+                return False, f"Failed to stop process: {str(e)}"
+    
+    return False, "No fckgit watch process found for this repository"
+
+
+def get_watch_status() -> tuple[bool, str]:
+    """Check if fckgit watch is running in current repo."""
+    repo_path = get_repo_path()
+    existing = find_fckgit_processes()
+    
+    for proc in existing:
+        if proc['cwd'] == repo_path:
+            return True, f"fckgit watch is running (PID: {proc['pid']})"
+    
+    return False, "fckgit watch is not running"
 
 
 @server.list_tools()

@@ -1,0 +1,30 @@
+# Changelog
+
+## [0.1.0] - 2026-01-03
+
+### Added
+- MCP (Model Context Protocol) server implementation
+- Six new MCP tools for AI assistants:
+  - `fckgit_status` - Get git status and diff
+  - `fckgit_generate_message` - Generate AI commit messages
+  - `fckgit_commit` - Auto-commit with AI-generated message
+  - `fckgit_commit_with_message` - Commit with specific message
+  - `fckgit_push` - Push to remote with auto-rebase
+  - `fckgit_cleanup_lock` - Clean up stale git lock files
+- Comprehensive MCP setup documentation (MCP_SETUP.md)
+- Installation scripts for MCP support (install_mcp.ps1, install_mcp.sh)
+- Test script to verify MCP setup (test_mcp.py)
+- Example MCP configuration file (mcp_config_example.json)
+- Package structure for mcp_server module
+
+### Changed
+- Updated setup.py to include mcp_server package
+- Added MCP as optional dependency
+- Enhanced README with MCP server section
+- Updated pyproject.toml with MCP entry points
+
+### Technical Details
+- MCP server runs via stdio transport
+- Uses existing fckgit functionality (git operations, Gemini AI)
+- Compatible with Cursor IDE, Claude Desktop, and other MCP clients
+- Maintains same security model as standalone fckgit tool
