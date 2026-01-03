@@ -21,7 +21,7 @@ This tool is for cool kids only:
 
 fckgit unlocks:
 - Extreme Mode 🏄‍♂️ 
-- Subscribers
+- Newsletter Subscribers
 - Increased token spend
 - Unlimited IP
 - 
