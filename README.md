@@ -1,8 +1,6 @@
 # fckgit
 
-<p align="center">
-  <img src="assets/banner.jpg" alt="fckgit - ZERO COMMITS GIVEN" width="100%"/>
-</p>
+![fckgit - ZERO COMMITS GIVEN](assets/banner.jpg)
 
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
