@@ -143,10 +143,10 @@ Windows moment. Just hit 'y' for victory.
 We auto-delete them. You're welcome.
 
 **Multiple fckgit instances running?**  
-Don't do that,/or ask your AI to kill the extra processes with Task Manager.
+Don't do that/ask your AI to kill the extra processes with Task Manager.
 
 **Hit API rate limits?**  
-Free tier gives you 15/min. With a 30 second cooldown, you should still be tripping that 4/5 times a session. Switch API key.
+Free tier gives you 15/min. With a 30 second cooldown, you should still be tripping that 4/5 times a session. Switch acccount and grab new API key.
 
 **Using this on a team repo?**  
 Stop that immediately. `--once` mode only permitted during hackathons.
