@@ -19,7 +19,7 @@ This tool is for cool kids only:
 
 ## Features 
 
-- 🤖 **AI Does Your Commits** - Gemini write your commit messages so you have more time to focus on your Youtube prompt engineering course.
+- 🤖 **AI Does Your Commits** - Gemini writes your commit messages so you have more time to focus on your Youtube prompt engineering course.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
