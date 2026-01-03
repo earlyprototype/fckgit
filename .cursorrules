@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "fckgit": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "c:\\Users\\Fab2\\Desktop\\AI\\_tools\\_fckgit",
+      "env": {
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}"
+      }
+    }
+  }
+}

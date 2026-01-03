@@ -194,5 +194,5 @@ Found a bug? Cool, fix it and send a PR. Or don't. I don't know what they are.
 </p>
 
 <p align="center">
-  <strong>Be a vibe smash that star button ⭐</strong>
+  <strong>Be a vibe warrior and smash that star button ⭐</strong>
 </p>
