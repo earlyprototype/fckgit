@@ -81,7 +81,7 @@ It literally just works:
 
 Clean. Simple. Gets out of your way.
 
-### Single Commit Mode (For Control Freaks)
+### Single Commit Mode 
 
 ```bash
 python -m fckgit --once
