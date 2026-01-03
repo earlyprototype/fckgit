@@ -93,7 +93,6 @@ Use this when you graduate university.
 
 File changes → AI reads diff → Generates message → Commits → Pushes. 
 
-That's it. It's not rocket science.
 
 ## When Stuff Breaks
 
@@ -101,7 +100,7 @@ That's it. It's not rocket science.
 We auto-delete them. You're welcome.
 
 **Multiple fckgit instances running?**  
-Yeah, don't do that. Kill the extras with Task Manager.
+Don't do that. Kill the extras with Task Manager.
 
 **Hit API rate limits?**  
 Free tier gives you 15/min. With a 30 second cooldown, you should be tripping that 4/5 times a session.
