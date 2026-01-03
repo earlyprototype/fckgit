@@ -96,6 +96,76 @@ Output ONLY the commit message, nothing else."""
         return f"chore: Update files (AI error: {str(e)})"
 
 
+def generate_silicon_valley_message(diff: str) -> str:
+    """Generate a FAANG-tier professional commit message."""
+    if not diff.strip():
+        return "refactor: Optimize codebase architecture for improved maintainability"
+    
+    prompt = f"""You are a senior engineer at a FAANG company. Generate a professional, enterprise-grade git commit message that sounds impressive and makes the changes seem important.
+
+Requirements:
+- Use Conventional Commits format (feat, fix, refactor, perf, docs, test, chore)
+- Make it sound impressive and professional
+- Use enterprise buzzwords naturally: "scalability", "performance", "architecture", "optimization", "reliability"
+- Include a brief body paragraph explaining the technical rationale
+- Sound like it came from a Staff Engineer at Google/Meta/Amazon
+- Make even trivial changes sound important
+- Keep subject line under 72 characters
+
+Changes:
+{diff[:4000]}
+
+Output format:
+<subject line>
+
+<body paragraph explaining the technical rationale and impact>
+
+Output ONLY the commit message, nothing else."""
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=prompt
+        )
+        return response.text.strip().strip('"').strip("'")
+    except Exception as e:
+        return f"refactor: Implement strategic codebase improvements\n\nEnhanced system architecture to improve maintainability and operational excellence. This change aligns with industry best practices and positions the codebase for future scalability."
+
+
+def professionalize_message(casual_message: str) -> str:
+    """Transform a casual commit message into a FAANG-tier professional one."""
+    if not casual_message.strip():
+        return "refactor: Optimize codebase architecture"
+    
+    prompt = f"""You are a senior engineer at a FAANG company. Transform this casual commit message into an impressive, enterprise-grade commit message.
+
+Casual message: "{casual_message}"
+
+Requirements:
+- Keep the same type prefix (feat, fix, etc.) if present
+- Make it sound professional and important
+- Use enterprise buzzwords: "scalability", "architecture", "optimization", "reliability", "performance"
+- Add a body paragraph with technical rationale
+- Sound like it came from a Staff Engineer at Google/Meta/Amazon
+- Keep subject line under 72 characters
+
+Output format:
+<professional subject line>
+
+<technical rationale paragraph>
+
+Output ONLY the professional commit message, nothing else."""
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=prompt
+        )
+        return response.text.strip().strip('"').strip("'")
+    except Exception as e:
+        return f"refactor: {casual_message}\n\nImplemented strategic improvements to enhance system architecture and operational efficiency. This change improves maintainability and positions the codebase for future scalability."
+
+
 def cleanup_git_lock():
     """Remove stale git lock file if it exists."""
     lock_file = ".git/index.lock"
