@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="fckgit",
@@ -6,11 +6,15 @@ setup(
     description="Auto-commit with AI-generated messages using Gemini",
     author="early_prototype",
     py_modules=["fckgit"],
+    packages=find_packages(),
     install_requires=[
         "google-genai>=1.0.0",
         "python-dotenv>=0.19.0",
         "watchdog>=2.0.0",
     ],
+    extras_require={
+        "mcp": ["mcp>=1.0.0"],
+    },
     entry_points={
         "console_scripts": [
             "fckgit=fckgit:main",
