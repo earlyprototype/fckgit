@@ -17,11 +17,12 @@ This tool is for cool kids only:
 - ❌ Commits literally everything you touch
 - ✅ Maximum speed 
 
-**"But muh git features!"** - Shut up Nerd. fckgit unlocks:
+**"But muh git features!"** - Nerd. fckgit unlocks:
 - Extreme vibe-coding🏄‍♂️ 
 - Subscribers
 - Increased token spend
 - VC potential
+- 
 
 
 ## Features 
