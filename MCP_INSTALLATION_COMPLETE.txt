@@ -35,18 +35,28 @@ Installation:
   test_mcp.py             - Setup verification script
 
 ================================================================================
-                            9 MCP TOOLS AVAILABLE
+                            11 MCP TOOLS AVAILABLE
 ================================================================================
 
 THE NUCLEAR OPTION:
 
 1. fckgit_blastoff
    START FULL AUTOMATIC MODE - Launch fckgit watch mode (auto-commits + auto-pushes)
+
+SILICON VALLEY MODE:
+
+2. fckgit_silicon_valley
+   Commit with FAANG-tier professional messages (enterprise buzzwords included)
    
-2. fckgit_watch_status
+3. fckgit_professionalize
+   Transform casual messages into impressive enterprise-grade commits
+
+WATCH MODE MANAGEMENT:
+   
+4. fckgit_watch_status
    Check if fckgit watch mode is currently running
    
-3. fckgit_stop_watch
+5. fckgit_stop_watch
    Stop the running fckgit watch process
 
 MANUAL OPERATIONS:

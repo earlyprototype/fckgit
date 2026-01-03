@@ -107,6 +107,28 @@ Launch fckgit in full automatic watch mode. This runs in the background and auto
 > "Start fckgit in automatic mode"
 > "Blastoff!"
 
+### `fckgit_silicon_valley` - FAANG MODE
+Commit with enterprise-grade, buzzword-rich professional messages. Makes your code sound like it came from a Staff Engineer at Google. Perfect for when recruiters are watching.
+
+**Parameters:**
+- `push` (boolean, optional): Auto-push after committing (default: false)
+- `stage_all` (boolean, optional): Stage all changes first (default: true)
+
+**Example usage:**
+> "Commit in Silicon Valley mode"
+> "Make this commit sound professional"
+> "FAANG-tier commit please"
+
+### `fckgit_professionalize` - MESSAGE TRANSFORMER
+Transform a casual commit message into a professional one. Shows you both versions without committing.
+
+**Parameters:**
+- `message` (string, required): The casual message to professionalize
+
+**Example usage:**
+> "Professionalize this message: 'fixed the bug lol'"
+> "Make this sound better: 'idk just updating stuff'"
+
 ### `fckgit_watch_status`
 Check if fckgit watch mode is currently running.
 

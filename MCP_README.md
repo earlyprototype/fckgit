@@ -29,17 +29,19 @@ Your abomination now has an MCP server. AI assistants can now commit and push yo
 
 ## Available MCP Tools
 
-Your AI assistant can now use these 9 tools:
+Your AI assistant can now use these 11 tools:
 
 1. **fckgit_blastoff** - THE NUCLEAR OPTION - Start full automatic watch mode
-2. **fckgit_watch_status** - Check if watch mode is running
-3. **fckgit_stop_watch** - Stop the watch mode process
-4. **fckgit_status** - Get git status and optionally the full diff
-5. **fckgit_generate_message** - Generate AI commit messages without committing
-6. **fckgit_commit** - Auto-commit with AI-generated message (optional auto-push)
-7. **fckgit_commit_with_message** - Commit with a specific message
-8. **fckgit_push** - Push to remote with automatic conflict resolution
-9. **fckgit_cleanup_lock** - Clean up stale git lock files
+2. **fckgit_silicon_valley** - SILICON VALLEY MODE - Commit with FAANG-tier professional messages
+3. **fckgit_professionalize** - Transform casual messages to enterprise-grade
+4. **fckgit_watch_status** - Check if watch mode is running
+5. **fckgit_stop_watch** - Stop the watch mode process
+6. **fckgit_status** - Get git status and optionally the full diff
+7. **fckgit_generate_message** - Generate AI commit messages without committing
+8. **fckgit_commit** - Auto-commit with AI-generated message (optional auto-push)
+9. **fckgit_commit_with_message** - Commit with a specific message
+10. **fckgit_push** - Push to remote with automatic conflict resolution
+11. **fckgit_cleanup_lock** - Clean up stale git lock files
 
 ## Quick Start
 
@@ -97,6 +99,8 @@ Restart Cursor/Claude Desktop for the changes to take effect.
 
 Ask your AI assistant:
 - "Blastoff!" (starts automatic watch mode)
+- "Commit in Silicon Valley mode" (professional FAANG-tier commit)
+- "Professionalize this message: 'fixed stuff'" (transform casual to professional)
 - "Is fckgit watching?" (check status)
 - "Stop watching" (stops watch mode)
 - "What's the git status?"

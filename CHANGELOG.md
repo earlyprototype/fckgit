@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.0] - 2026-01-03
+
+### Added
+- **`fckgit_silicon_valley`** - SILICON VALLEY MODE - Commit with FAANG-tier professional messages
+- **`fckgit_professionalize`** - Transform casual commit messages into enterprise-grade ones
+- SILICON_VALLEY.md - Complete guide to professional commit mode
+- Buzzword-rich commit message generation
+- Technical rationale paragraphs in professional commits
+
+### Changed
+- MCP tools expanded from 9 to 11
+- Enhanced AI prompts for enterprise-grade message generation
+- Updated all documentation to include Silicon Valley mode
+
+### Features
+- Makes commits sound like they're from a Staff Engineer at Google/Meta/Amazon
+- Transforms embarrassing commits into impressive ones
+- Includes technical rationale and impact analysis
+- Uses enterprise buzzwords: scalability, architecture, optimization, reliability
+- Perfect for when recruiters are watching your GitHub
+
 ## [0.1.1] - 2026-01-03
 
 ### Added
