@@ -369,6 +369,35 @@ async def handle_list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {}
             }
+        ),
+        types.Tool(
+            name="fckgit_blastoff",
+            description="START AUTOMATIC WATCH MODE - Launch fckgit in full auto mode (watches files, auto-commits, auto-pushes). Maximum automation. This runs in the background until stopped.",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
+        types.Tool(
+            name="fckgit_stop_watch",
+            description="Stop the running fckgit watch mode process",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pid": {
+                        "type": "number",
+                        "description": "Optional: specific process ID to stop"
+                    }
+                }
+            }
+        ),
+        types.Tool(
+            name="fckgit_watch_status",
+            description="Check if fckgit watch mode is currently running",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
         )
     ]
 
@@ -481,6 +510,28 @@ async def handle_call_tool(
         if cleaned:
             return [types.TextContent(type="text", text="Cleaned up stale git lock file")]
         return [types.TextContent(type="text", text="No stale git lock file found")]
+    
+    elif name == "fckgit_blastoff":
+        success, message, pid = start_watch_mode()
+        if success:
+            result = f"BLASTOFF! {message}\n\n"
+            result += "fckgit is now watching for changes and will:\n"
+            result += "- Auto-commit every change with AI-generated messages\n"
+            result += "- Auto-push to remote\n"
+            result += "- 30 second cooldown between commits\n\n"
+            result += "Use fckgit_stop_watch to stop it."
+        else:
+            result = message
+        return [types.TextContent(type="text", text=result)]
+    
+    elif name == "fckgit_stop_watch":
+        pid = arguments.get("pid")
+        success, message = stop_watch_mode(pid=pid)
+        return [types.TextContent(type="text", text=message)]
+    
+    elif name == "fckgit_watch_status":
+        is_running, message = get_watch_status()
+        return [types.TextContent(type="text", text=message)]
     
     else:
         return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
