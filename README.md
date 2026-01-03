@@ -104,7 +104,7 @@ We auto-delete them. You're welcome.
 Yeah, don't do that. Kill the extras with Task Manager.
 
 **Hit API rate limits?**  
-Free tier gives you 15/min. With a 30 second cooldown, you'd need to code pretty hard to hit it.
+Free tier gives you 15/min. With a 30 second cooldown, you should be tripping that
 
 **Using this on a team repo?**  
 Stop. Use `--once` mode or your hackathon teammates will hate you.
