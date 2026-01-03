@@ -38,6 +38,6 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "🚀 Now go write some code. fckgit handles the rest." -ForegroundColor Green
 } else {
     Write-Host ""
-    Write-Host "❌ Installation failed. But you probably didn't follow instructions anyway." -ForegroundColor Red
+    Write-Host "❌ Installation failed. But you probably did not follow instructions anyway." -ForegroundColor Red
     exit 1
 }
