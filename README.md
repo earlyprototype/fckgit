@@ -129,10 +129,10 @@ We auto-delete them. You're welcome.
 Don't do that or ask your AI to kill the extras with Task Manager.
 
 **Hit API rate limits?**  
-Free tier gives you 15/min. With a 30 second cooldown, you should be tripping that 4/5 times a session.
+Free tier gives you 15/min. With a 30 second cooldown, you should still be tripping that 4/5 times a session.
 
 **Using this on a team repo?**  
-Stop. Use `--once` mode or your hackathon teammates will hate you.
+Stop that immediately. Use `--once` mode or your hackathon teammates will hate you.
 
 ## What You Need
 
