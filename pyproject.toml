@@ -24,3 +24,6 @@ fckgit = "fckgit:main"
 
 [project.optional-dependencies]
 mcp = ["mcp>=1.0.0"]
+
+[project.entry-points."mcp"]
+fckgit = "mcp_server:main"
