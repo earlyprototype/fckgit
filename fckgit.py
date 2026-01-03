@@ -55,6 +55,9 @@ def get_staged_diff():
 
 def generate_message(diff: str) -> str:
     """Generate commit message using Gemini."""
+    if not diff.strip():
+        return "chore: Update files"
+    
     prompt = f"""Generate a concise git commit message following Conventional Commits format.
 
 Rules:
@@ -67,11 +70,15 @@ Changes:
 
 Output ONLY the commit message, nothing else."""
     
-    response = client.models.generate_content(
-        model='gemini-2.5-flash-lite',
-        contents=prompt
-    )
-    return response.text.strip().strip('"').strip("'")
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=prompt
+        )
+        return response.text.strip().strip('"').strip("'")
+    except Exception as e:
+        print(f"⚠️  AI timeout/error, using fallback message: {e}")
+        return "chore: Update files"
 
 
 def cleanup_git_lock():
