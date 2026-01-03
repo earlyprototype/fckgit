@@ -19,7 +19,6 @@ AI to the core, with almost zero visibility.
 
 ## ⚠️ Warning
 
-This tool is for cool kids only:
 - ❌ No carefully crafted commit messages
 - ❌ No logical commit boundaries  
 - ❌ No `git rebase -i` to clean up history
