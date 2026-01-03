@@ -65,7 +65,7 @@ It literally just works:
 - You code, it commits
 - AI writes the message
 - Auto-pushes to GitHub
-- 30 second cooldown so you can actually code
+- 30 second cooldown 
 - `Ctrl+C` when you're done being productive
 
 **What you'll see:**
