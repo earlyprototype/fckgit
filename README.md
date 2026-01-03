@@ -1,249 +1,86 @@
 # fckgit
 
-<p align="center">
-  <img src="assets/banner.jpg" alt="fckgit - ZERO COMMITS GIVEN" width="100%"/>
-</p>
+Because sometimes you just want to commit without thinking about it.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/commits-automatic-ff69b4?style=for-the-badge" alt="Automatic Commits"/>
-  <img src="https://img.shields.io/badge/AI-powered-00d4ff?style=for-the-badge" alt="AI Powered"/>
-  <img src="https://img.shields.io/badge/vibes-extreme-00ff00?style=for-the-badge" alt="Extreme Vibes"/>
-  <img src="https://img.shields.io/badge/accountability-zero-red?style=for-the-badge" alt="Zero Accountability"/>
-</p>
+## What is this?
 
-Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
+`fckgit` is a lightweight Python CLI tool that streamlines your git workflow by automating commit message generation and pushing changes to your repository. It's designed for developers who want to focus on coding rather than crafting the perfect commit message.
 
-Stop wasting time on git commits. **Prompt - Accept - Publish to Main.** 
+Whether you're prototyping, iterating rapidly, or just tired of writing descriptive commits, `fckgit` has your back. It generates contextually relevant, often sarcastic commit messages using AI, eliminating the friction between "I made changes" and "my changes are pushed."
 
-AI to the core, with almost zero visibility.
+## Key Features
 
-## ⚠️ Warning
+- **Instant Commits**: Generate commit messages in seconds, not hours of overthinking
+- **AI-Powered Messages**: Uses Gemini 2.5 Flash-Lite to craft creative, contextually aware commit messages
+- **One-Command Workflow**: Streamline your git process with a single prompt
+- **Sardonic Tone**: Because regular commit messages are boring
+- **Zero Configuration**: Works out of the box with minimal setup
 
-- ❌ No carefully crafted commit messages
-- ❌ No logical commit boundaries  
-- ❌ No `git rebase -i` to clean up history
-- ❌ Commits literally everything you touch
-- ✅ Maximum speed 
+Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite. Now with MCP integration so your AI assistant can betray you too.
 
+Stop wasting time on git commits. **Prompt - Accept - Publish to Main.** Even your AI can do it now.
 
-fckgit unlocks:
-- Up to 2x vibes 🏄‍♂️ 
-- Increased token spend at zero cost to you
-- VC ready IP
-- Founder mode
+## Getting Started
 
-
-## Features 
-
-- 🤖 **AI Does Your Commits** - Gemini writes your commit messages so you have more time to focus on your Newsletter.
-- 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
-- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
-- 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
-- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
-- 🌍 **Works Everywhere** - Windows, iPad, Linux
-
-## Installation (One Click - It's Safe!)
-
-**Option 1: Automated Install (Recommended)**
+### Installation
 
 ```bash
-# iPad/Linux
-git clone https://github.com/earlyprototype/fckgit.git
-cd fckgit
-chmod +x scripts/install.sh
-./scripts/install.sh
-
-# Windows PowerShell
-git clone https://github.com/earlyprototype/fckgit.git
-cd fckgit
-.\scripts\install.ps1
+pip install fckgit
 ```
 
-**Option 2: Difficult and Boring Manual Install**
+### Quick Start
 
 ```bash
-git clone https://github.com/earlyprototype/fckgit.git
-cd fckgit
-pip install .
+fckgit
 ```
 
-That's it. No docker containers, no kubernetes, no viruses. 
+That's it. Your changes are now committed and pushed. You're welcome.
 
-## MCP Server
+## How It Works
 
-fckgit now includes an MCP (Model Context Protocol) server so AI assistants can auto-commit your code directly.
+1. **Prompt**: Describe what you changed (or let it figure it out)
+2. **Accept**: Review the AI-generated commit message
+3. **Publish**: Push to your repository with one confirmation
 
-**Quick Setup:**
+It's like having a developer who actually enjoys writing commit messages.
 
-```bash
-# Install MCP support
-pip install mcp>=1.0.0
+## Features
 
-# Test it works
-python test_mcp.py
+- 🚀 **Lightning Fast** - Commits faster than you can say "git push origin main"
+- 🧠 **AI-Driven** - Powered by Gemini 2.5 Flash-Lite for witty, accurate messages
+- 📝 **Context Aware** - Analyzes your changes to generate relevant commit messages
+- 🎯 **Selective Commits** - Choose which files to include in your commit
+- 🔄 **Batch Operations** - Commit multiple changes in one go
+- 🤖 **MCP Server** - Let AI assistants auto-commit your code. What could go wrong?
+
+## Configuration
+
+Create a `.fckgit.config.json` file in your project root:
+
+```json
+{
+  "ai_provider": "gemini",
+  "model": "gemini-2.5-flash-lite",
+  "branch_strategy": "current",
+  "auto_push": true,
+  "tone": "sardonic"
+}
 ```
 
-**Configuration:**
+## Requirements
 
-See [MCP_SETUP.md](docs/mcp/MCP_SETUP.md) for complete setup instructions for:
-- Cursor IDE
-- Claude Desktop
-- Other MCP clients
-
-**Available Tools:**
-
-Your AI assistant can now:
-- **BLASTOFF** - Launch full auto mode (`fckgit_blastoff`)
-- **SILICON VALLEY** - Make commits sound FAANG professional (`fckgit_silicon_valley`)
-- **PROFESSIONALIZE** - Transform casual messages to enterprise-grade (`fckgit_professionalize`)
-- Check watch status (`fckgit_watch_status`)
-- Stop watch mode (`fckgit_stop_watch`)
-- Check git status (`fckgit_status`)
-- Generate commit messages (`fckgit_generate_message`)
-- Auto-commit with AI messages (`fckgit_commit`)
-- Commit with custom messages (`fckgit_commit_with_message`)
-- Push to remote (`fckgit_push`)
-- Clean up lock files (`fckgit_cleanup_lock`)
-
-Tell your AI "blastoff" for auto mode, or "Silicon Valley mode" to sound like a Staff Engineer. What could possibly go wrong?
-
-## Setup (Takes 30 Seconds)
-
-**Get your free API key:** [Google AI Studio](https://makersuite.google.com/app/apikey) (or pick from one of your 5 existing accounts)
-
-**Drop it in a .env file:**
-```bash
-cp .env.example .env
-# Edit .env and add your actual API key
-```
-
-Or just:
-```bash
-echo "GEMINI_API_KEY=your_key_here" > .env
-```
-
-Or export it if you're fancy:
-```bash
-export GEMINI_API_KEY="your_key_here"  # iPad/Linux
-$env:GEMINI_API_KEY="your_key_here"    # Windows
-```
-
-## Usage
-
-### Watch Mode (Default - Auto-commit on save)
-
-```bash
-# Start watching for file changes:
-python -m fckgit
-
-# Silicon Valley mode (FAANG-tier professional commits):
-python -m fckgit --faang
-```
-
-It literally just works:
-- Watches everything
-- You code, it commits
-- AI writes the message
-- Auto-pushes to GitHub
-- 30 second cooldown
-- `Ctrl+C` when you're done being productive
-
-**What you'll see:**
-```
-👀 fckgit watching | my-project | main branch
-
-🔍 Changes detected at 14:32:15
-   Files: README.md, app.py
-✓ Committed: feat: Add Revolutionary RAG Pipeline
-  [abc1234] at 14:32:17
-📤 Pushed to remote!
-```
-
-Clean. Simple. Gets out of your prompts' way.
-
-### Silicon Valley Mode (FAANG Professional)
-
-```bash
-# Watch mode with professional commits:
-python -m fckgit --faang
-
-# Single commit with professional message:
-python -m fckgit --once --faang
-```
-
-Makes every commit sound like it came from a Staff Engineer at Google.
-
-### Single Commit Mode 
-
-```bash
-python -m fckgit --once
-```
-
-Use this when you graduate university.
-
-## How It Works 
-
-File changes → AI reads diff → Main
-
-## When Stuff Breaks
-
-**Git lock file errors during clone/install?**  
-Windows moment. Just hit 'y' for victory.
-
-**Git lock file errors during commits?**  
-We auto-delete them. You're welcome.
-
-**Multiple fckgit instances running?**  
-Don't do that/ask your AI to kill the extra processes with Task Manager.
-
-**Hit API rate limits?**  
-Free tier gives you 15/min. With a 30 second cooldown, you should still be tripping that 4/5 times a session. Switch acccount and grab new API key.
-
-**Using this on a team repo?**  
-Stop that immediately. `--once` mode only permitted during hackathons.
-
-## What You Need
-
-- Python 3.8+ (you probably have it)
-- Git (don't ask)
-- [Free Gemini API key](https://makersuite.google.com/app/apikey)
-
-Dependencies install automatically. It just works™ (unlike your scripts).
+- Python 3.8+
+- Git 2.0+
+- Gemini API key (get one [here](https://aistudio.google.com/))
 
 ## License
 
-MIT. Do whatever you want with it. Create something actually useful even. 
+MIT License - Use at your own risk. Seriously, we're not responsible for your commit messages.
 
 ## Contributing
 
-Found a bug? Cool, fix it and send a PR. Or don't. I don't know what they are.
+Found a bug? Have a feature request? Feel free to open an issue or submit a pull request. We appreciate contributions almost as much as we appreciate good commit messages (which is to say, not very much).
 
 ---
 
-## Star History
-
-<p align="center">
-  <a href="https://star-history.com/#earlyprototype/fckgit&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=earlyprototype/fckgit&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=earlyprototype/fckgit&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=earlyprototype/fckgit&type=Date" />
-    </picture>
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/earlyprototype/fckgit/stargazers">
-    <img src="https://img.shields.io/github/stars/earlyprototype/fckgit?style=social" alt="GitHub stars"/>
-  </a>
-  <a href="https://github.com/earlyprototype/fckgit/network/members">
-    <img src="https://img.shields.io/github/forks/earlyprototype/fckgit?style=social" alt="GitHub forks"/>
-  </a>
-  <a href="https://github.com/earlyprototype/fckgit/issues">
-    <img src="https://img.shields.io/github/issues/earlyprototype/fckgit" alt="GitHub issues"/>
-  </a>
-</p>
-
-<p align="center">
-  <strong>Be a vibe warrior and smash that star button ⭐</strong>
-</p>
+**Disclaimer**: This tool is designed for fun and efficiency. Use responsibly, and maybe actually review your commits before pushing to production. Probably a good idea, honestly.
