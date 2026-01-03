@@ -143,6 +143,12 @@ class GitChangeHandler(FileSystemEventHandler):
         # Small delay to ensure file writes are complete
         time.sleep(0.5)
         
+        # Check if there are actually any changes
+        status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        if not status_result.stdout.strip():
+            # No changes, silently skip
+            return
+        
         # Get diff
         diff = get_staged_diff() or get_diff()
         
@@ -151,11 +157,18 @@ class GitChangeHandler(FileSystemEventHandler):
         
         print("\n" + "="*50)
         print("🔍 Changes detected! Analyzing...")
-        message = generate_message(diff)
         
-        if message:
-            if commit(message):
-                push()
+        try:
+            message = generate_message(diff)
+            
+            if message:
+                if commit(message):
+                    push()
+            else:
+                print("❌ Failed to generate commit message.")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+        
         print("="*50 + "\n")
 
 
