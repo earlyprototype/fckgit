@@ -66,7 +66,7 @@ It literally just works:
 - You code, it commits
 - AI writes the message
 - Auto-pushes to GitHub
-- 5 second cooldown so you don't spam
+- 30 second cooldown so you can actually code
 - `Ctrl+C` when you're done being productive
 
 **What you'll see:**
@@ -105,7 +105,7 @@ We auto-delete them. You're welcome.
 Yeah, don't do that. Kill the extras with Task Manager.
 
 **Hit API rate limits?**  
-Free tier gives you 15/min. Take a break, touch grass, come back in 60 seconds.
+Free tier gives you 15/min. With our 30 second cooldown, you'd need to code pretty hard to hit it.
 
 **Using this on a team repo?**  
 Stop. Use `--once` mode or your hackathon teammates will hate you.
