@@ -13,9 +13,10 @@ if sys.platform == 'win32':
         pass
 
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 except ImportError:
-    print("❌ google-generativeai not installed. Run: pip install google-generativeai")
+    print("❌ google-genai not installed. Run: pip install google-genai")
     sys.exit(1)
 
 try:
@@ -38,8 +39,7 @@ if not api_key:
     print("❌ GEMINI_API_KEY environment variable not set.")
     sys.exit(1)
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-2.5-flash-lite")
+client = genai.Client(api_key=api_key)
 
 
 def get_diff():
