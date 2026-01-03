@@ -264,7 +264,11 @@ def watch_mode():
     status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if status_result.stdout.strip():
         print("🔍 Found existing changes, committing before starting watch...")
-        diff = get_staged_diff() or get_diff()
+        
+        # FIX: Stage files FIRST so untracked files appear in diff
+        subprocess.run(["git", "add", "-A"], capture_output=True)
+        
+        diff = get_staged_diff()
         if diff.strip():
             try:
                 message = generate_message(diff)
