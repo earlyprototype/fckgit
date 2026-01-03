@@ -199,9 +199,10 @@ def push():
 class GitChangeHandler(FileSystemEventHandler):
     """Handle file system events and trigger commits."""
     
-    def __init__(self):
+    def __init__(self, faang_mode: bool = False):
         self.last_commit_time = 0
         self.cooldown = 30  # seconds between commits
+        self.faang_mode = faang_mode
         
     def should_process(self, event):
         """Check if we should process this event."""
@@ -261,10 +262,13 @@ class GitChangeHandler(FileSystemEventHandler):
         print("\n" + "="*50)
         print(f"🔍 Changes detected at {timestamp}")
         print(f"   Files: {', '.join(changed_files[:3])}{' ...' if len(changed_files) > 3 else ''}")
-        print("   Analyzing with AI...")
+        if self.faang_mode:
+            print("   Analyzing with AI... (SILICON VALLEY MODE)")
+        else:
+            print("   Analyzing with AI...")
         
         try:
-            message = generate_message(diff)
+            message = generate_message(diff, faang_mode=self.faang_mode)
             
             if message:
                 if commit(message):
@@ -282,7 +286,7 @@ class GitChangeHandler(FileSystemEventHandler):
         print("="*50 + "\n")
 
 
-def watch_mode():
+def watch_mode(faang_mode: bool = False):
     """Start watching for file changes."""
     if not WATCHDOG_AVAILABLE:
         print("❌ watchdog not installed. Run: pip install watchdog")
@@ -299,9 +303,14 @@ def watch_mode():
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     print("="*50)
-    print("👀 fckgit - Auto-commit watcher started")
+    if faang_mode:
+        print("👀 fckgit - Auto-commit watcher started (SILICON VALLEY MODE)")
+    else:
+        print("👀 fckgit - Auto-commit watcher started")
     print(f"   Repository: {repo_name}")
     print(f"   Branch: {branch}")
+    if faang_mode:
+        print("   Mode: FAANG Professional")
     print(f"   Started: {start_time}")
     print(f"   Press Ctrl+C to stop")
     print("="*50)
@@ -310,7 +319,10 @@ def watch_mode():
     # Check for existing changes before starting to watch
     status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if status_result.stdout.strip():
-        print("🔍 Found existing changes, committing before starting watch...")
+        if faang_mode:
+            print("🔍 Found existing changes, committing before starting watch... (SILICON VALLEY MODE)")
+        else:
+            print("🔍 Found existing changes, committing before starting watch...")
         
         # FIX: Stage files FIRST so untracked files appear in diff
         subprocess.run(["git", "add", "-A"], capture_output=True)
@@ -318,7 +330,7 @@ def watch_mode():
         diff = get_staged_diff()
         if diff.strip():
             try:
-                message = generate_message(diff)
+                message = generate_message(diff, faang_mode=faang_mode)
                 if message:
                     if commit(message):
                         push()
@@ -327,7 +339,7 @@ def watch_mode():
                 print(f"❌ Error committing existing changes: {e}")
                 print()
     
-    event_handler = GitChangeHandler()
+    event_handler = GitChangeHandler(faang_mode=faang_mode)
     observer = Observer()
     observer.schedule(event_handler, ".", recursive=True)
     observer.start()
@@ -351,6 +363,11 @@ def main():
         action="store_true",
         help="Run once instead of watching for changes"
     )
+    parser.add_argument(
+        "--faang",
+        action="store_true",
+        help="Silicon Valley mode - Generate FAANG-tier professional commit messages"
+    )
     args = parser.parse_args()
     
     # Check if we're in a git repo
@@ -368,8 +385,12 @@ def main():
             print("No changes to commit.")
             return
         
-        print("🔍 Analyzing changes...")
-        message = generate_message(diff)
+        if args.faang:
+            print("🔍 Analyzing changes... (SILICON VALLEY MODE)")
+        else:
+            print("🔍 Analyzing changes...")
+        
+        message = generate_message(diff, faang_mode=args.faang)
         
         if message:
             if commit(message):
@@ -379,7 +400,7 @@ def main():
         return
     
     # Default: Watch mode
-    watch_mode()
+    watch_mode(faang_mode=args.faang)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,27 @@
 
 Make your commits sound like you work at a FAANG company instead of coding in your pants at 3am.
 
+## Usage
+
+### Standalone Tool
+
+Use the `--faang` flag:
+
+```bash
+# Watch mode with Silicon Valley commits:
+python -m fckgit --faang
+
+# Single commit with professional message:
+python -m fckgit --once --faang
+```
+
+### MCP Server
+
+Tell your AI assistant:
+- "Commit in Silicon Valley mode"
+- "Make this commit sound professional"
+- "Professionalize this message: 'fixed stuff'"
+
 ## The Problem
 
 Your actual commits:

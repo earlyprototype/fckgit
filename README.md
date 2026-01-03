@@ -135,6 +135,9 @@ $env:GEMINI_API_KEY="your_key_here"    # Windows
 ```bash
 # Start watching for file changes:
 python -m fckgit
+
+# Silicon Valley mode (FAANG-tier professional commits):
+python -m fckgit --faang
 ```
 
 It literally just works:
@@ -157,6 +160,18 @@ It literally just works:
 ```
 
 Clean. Simple. Gets out of your prompts' way.
+
+### Silicon Valley Mode (FAANG Professional)
+
+```bash
+# Watch mode with professional commits:
+python -m fckgit --faang
+
+# Single commit with professional message:
+python -m fckgit --once --faang
+```
+
+Makes every commit sound like it came from a Staff Engineer at Google.
 
 ### Single Commit Mode 
 
