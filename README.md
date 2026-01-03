@@ -39,9 +39,9 @@ _AI to the core, with almost zero visibility._
 ## fckgit unlocks:
 - Up to 3x vibes 🏄‍♂️ 
 - Increased token spend at zero cost to you
-- FAANG literacy
+- FAANG adjaceny
 - Founder mode
-- Dopamine and optimism
+- Growth Mindset
   
 ## ⚠️ Warning 
 
