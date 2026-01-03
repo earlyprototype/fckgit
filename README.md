@@ -23,7 +23,7 @@ fckgit unlocks:
 - Extreme Mode 🏄‍♂️ 
 - Subscribers
 - Increased token spend
-- VC potential
+- Unlimited IP
 - 
 
 
