@@ -27,7 +27,7 @@ If you work on a team, for the love of git, **use `--once` mode** and review bef
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
 - 🌍 **Works Everywhere** - Windows, Mac, Linux, cafes, hostels, Wetherspoons - We don't discriminate.
 
-## Installation (Obviously)
+## Installation 
 
 ```bash
 git clone https://github.com/earlyprototype/fckgit.git
@@ -35,7 +35,7 @@ cd fckgit
 pip install .
 ```
 
-That's it. No docker containers, no kubernetes, no build scripts. Just works.
+That's it. No docker containers, no kubernetes, no build scripts. We'll probably have an MCP 
 
 ## Setup (Takes 30 Seconds)
 
