@@ -18,14 +18,14 @@ This tool is only for cool kids:
 
 If you work on a team, for the love of git, **use `--once` mode** and review before pushing. Or don't. We're not your parents.
 
-## Features
+## Features (Yeah, We Got 'Em)
 
-- 🤖 **AI-Powered Commits** - Gemini generates conventional commit messages automatically
-- 👀 **Watch Mode** - Auto-commits and pushes on every file save (default)
-- ⚡ **Fast & Cheap** - Uses Gemini 2.5 Flash-Lite for speed and low cost
-- 🔧 **Smart Error Handling** - Auto-cleanup of git lock files and detailed error messages
-- 📝 **Detailed Logging** - Timestamps, commit hashes, and file tracking for easy debugging
-- 🌍 **Cross-Platform** - Works on Windows, macOS, and Linux
+- 🤖 **AI Does Your Commits** - Gemini actually writes good messages. Better than your "fix stuff" commits.
+- 👀 **Auto-Everything** - Watches files, commits, pushes. You literally just save and it's done.
+- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Your free tier goes far.
+- 🔧 **Handles Git's BS** - Cleans up lock files automatically because git is moody.
+- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you inevitably need to debug.
+- 🌍 **Works Everywhere** - Windows, Mac, Linux. We don't discriminate.
 
 ## Installation
 
