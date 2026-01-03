@@ -13,8 +13,8 @@ This tool is for cool kids only:
 - ❌ Commits literally everything you touch
 - ✅ Maximum speed 
 
-**"But muh git features!"** - Shut up Nerd. This tool unlocks:
-- Extreme vibe-codeing🏄‍♂️ 
+**"But muh git features!"** - Shut up Nerd. fckgit unlocks:
+- Extreme vibe-coding🏄‍♂️ 
 
 
 ## Features 
