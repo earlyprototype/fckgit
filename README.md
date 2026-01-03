@@ -16,7 +16,7 @@ This tool is only for cool kids:
 **"But muh git features!"** - Shut up Nerd. This tool is for:
 - Extreme solo vibe-riders only🏄‍♂️ 
 
-If you work on a team (you don't), for the love of git, **use `--once` mode** and review before pushing. Or don't. We're not your parents.
+If you work on a team (you don't), for the love of Perplexity, **use `--once` mode** and review before pushing. Or don't. We're not your parents.
 
 ## Features (Yeah, We Got 'Em)
 
