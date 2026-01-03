@@ -13,7 +13,7 @@ This tool is for cool kids only:
 - ❌ Commits literally everything you touch
 - ✅ Maximum speed 
 
-**"But muh git features!"** - Shut up Nerd. This tool is for:
+**"But muh git features!"** - Shut up Nerd. This tool enables:
 - Extreme solo vibe-coders only🏄‍♂️ 
 
 
