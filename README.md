@@ -104,7 +104,7 @@ File changes → AI reads diff → Generates message → Commits → Pushes.
 We auto-delete them. You're welcome.
 
 **Multiple fckgit instances running?**  
-Don't do that. As your AI to kill the extras with Task Manager.
+Don't do that. Ask your AI to kill the extras with Task Manager.
 
 **Hit API rate limits?**  
 Free tier gives you 15/min. With a 30 second cooldown, you should be tripping that 4/5 times a session.
