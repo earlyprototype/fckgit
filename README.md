@@ -4,6 +4,20 @@ Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
 Big Things! Soooon!
 
+
+
+
+
+
+
+
+
+
+
+
+
+??
+
 ## Installation
 
 ```bash
