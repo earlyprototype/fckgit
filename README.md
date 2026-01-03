@@ -25,7 +25,7 @@ fckgit unlocks:
 - Unlimited IP
 - Zero accountability
 - Maximum deniability
-- Founder mode commits 
+- Founder mode commits Found
 
 
 ## Features 
