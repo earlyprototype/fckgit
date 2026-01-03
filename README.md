@@ -17,20 +17,22 @@ Stop wasting time on git commits. **Prompt - Accept - Publish to Main.**
 
 AI to the core, with almost zero visibility.
 
-## ⚠️ Warning
+## ⚠️ Warning 
 
 - ❌ No carefully crafted commit messages
 - ❌ No logical commit boundaries  
 - ❌ No `git rebase -i` to clean up history
 - ❌ Commits literally everything you touch
+- ✅ Needlessly bloated MCP server
 - ✅ Maximum speed 
 
 
-fckgit unlocks:
-- Up to 2x vibes 🏄‍♂️ 
+## fckgit unlocks:
+- Up to 3x vibes 🏄‍♂️ 
 - Increased token spend at zero cost to you
-- VC ready IP
+- FAANG literacy
 - Founder mode
+- LLM psychosis
 
 
 ## Features 
