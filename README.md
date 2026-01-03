@@ -132,7 +132,7 @@ Don't do that or ask your AI to kill the extras with Task Manager.
 Free tier gives you 15/min. With a 30 second cooldown, you should still be tripping that 4/5 times a session.
 
 **Using this on a team repo?**  
-Stop that immediately. Use `--once` mode or your hackathon teammates will hate you.
+Stop that immediately. `--once` mode or your hackathon teammates will hate you.
 
 ## What You Need
 
