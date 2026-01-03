@@ -16,7 +16,7 @@ This tool is only for cool kids:
 **"But muh git features!"** - Shut up Nerd. This tool is for:
 - Extreme solo vibe-coders only🏄‍♂️ 
 
-If you do work on a team (you don't), for the love of Perplexity, **use `--once` mode** and review before pushing. 
+
 
 ## Features (Yeah, We Got 'Em)
 
