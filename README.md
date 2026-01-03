@@ -14,7 +14,7 @@ This tool is for cool kids only:
 - ✅ Maximum speed 
 
 **"But muh git features!"** - Shut up Nerd. This tool enables:
-- Extreme solo vibe-codering
+- Extreme solo vibe-codering🏄‍♂️ 
 
 
 ## Features 
