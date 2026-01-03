@@ -73,13 +73,14 @@ Output ONLY the commit message, nothing else."""
 
 def commit(message: str) -> bool:
     """Stage all changes and commit."""
-    subprocess.run(["git", "add", "-A"])
-    result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True)
+    subprocess.run(["git", "add", "-A"], capture_output=True)
+    result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode == 0:
         print(f"✓ Committed: {message}")
         return True
     else:
-        print(f"❌ Commit failed: {result.stderr}")
+        error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+        print(f"❌ Commit failed: {error_msg}")
         return False
 
 
