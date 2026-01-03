@@ -52,7 +52,7 @@ cd fckgit
 .\install.ps1
 ```
 
-**Option 2: Manual Install (Option 1 is safe )**
+**Option 2: Manual Install (Option 1 is safe though)**
 
 ```bash
 git clone https://github.com/earlyprototype/fckgit.git
