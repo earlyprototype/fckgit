@@ -27,16 +27,15 @@ If you work on a team, for the love of git, **use `--once` mode** and review bef
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you inevitably need to debug.
 - 🌍 **Works Everywhere** - Windows, Mac, Linux. We don't discriminate.
 
-## Installation
+## Installation (Obviously)
 
 ```bash
-# Clone the repo
 git clone https://github.com/earlyprototype/fckgit.git
 cd fckgit
-
-# Install with pip
 pip install .
 ```
+
+That's it. No docker containers, no kubernetes, no build scripts. Just works.
 
 ## Setup (Takes 30 Seconds)
 
