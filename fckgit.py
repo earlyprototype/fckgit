@@ -91,7 +91,13 @@ def commit(message: str) -> bool:
     subprocess.run(["git", "add", "-A"], capture_output=True)
     result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode == 0:
+        # Get the commit hash
+        hash_result = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+        commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
+        
+        timestamp = datetime.now().strftime("%H:%M:%S")
         print(f"✓ Committed: {message}")
+        print(f"  [{commit_hash}] at {timestamp}")
         return True
     else:
         # Check if the error is just "nothing to commit"
@@ -101,13 +107,15 @@ def commit(message: str) -> bool:
             return False
         else:
             # This is a real error
-            print(f"❌ Commit failed: {error_msg}")
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"❌ Commit failed at {timestamp}: {error_msg}")
             return False
 
 
 def push():
     """Push to remote repository."""
-    print("📤 Pushing to remote...")
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"📤 Pushing to remote... ({timestamp})")
     result = subprocess.run(["git", "push"], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode == 0:
         print("✓ Pushed to remote!")
