@@ -62,7 +62,7 @@ pip install .
 
 That's it. No docker containers, no kubernetes, no build scripts. 
 
-Intern working on MCP (available soon).
+Intern working on MCP (available soon - stop asking).
 
 ## Setup (Takes 30 Seconds)
 
