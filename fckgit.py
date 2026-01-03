@@ -53,8 +53,11 @@ def get_staged_diff():
     return result.stdout if result.returncode == 0 else ""
 
 
-def generate_message(diff: str) -> str:
+def generate_message(diff: str, faang_mode: bool = False) -> str:
     """Generate commit message using Gemini."""
+    if faang_mode:
+        return generate_silicon_valley_message(diff)
+    
     if not diff.strip():
         return "chore: Update files"
     
@@ -79,6 +82,43 @@ Output ONLY the commit message, nothing else."""
     except Exception as e:
         print(f"⚠️  AI timeout/error, using fallback message: {e}")
         return "chore: Update files"
+
+
+def generate_silicon_valley_message(diff: str) -> str:
+    """Generate a FAANG-tier professional commit message."""
+    if not diff.strip():
+        return "refactor: Optimize codebase architecture for improved maintainability"
+    
+    prompt = f"""You are a senior engineer at a FAANG company. Generate a professional, enterprise-grade git commit message that sounds impressive and makes the changes seem important.
+
+Requirements:
+- Use Conventional Commits format (feat, fix, refactor, perf, docs, test, chore)
+- Make it sound impressive and professional
+- Use enterprise buzzwords naturally: "scalability", "performance", "architecture", "optimization", "reliability"
+- Include a brief body paragraph explaining the technical rationale
+- Sound like it came from a Staff Engineer at Google/Meta/Amazon
+- Make even trivial changes sound important
+- Keep subject line under 72 characters
+
+Changes:
+{diff[:4000]}
+
+Output format:
+<subject line>
+
+<body paragraph explaining the technical rationale and impact>
+
+Output ONLY the commit message, nothing else."""
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=prompt
+        )
+        return response.text.strip().strip('"').strip("'")
+    except Exception as e:
+        print(f"⚠️  AI timeout/error, using fallback message: {e}")
+        return f"refactor: Implement strategic codebase improvements\n\nEnhanced system architecture to improve maintainability and operational excellence. This change aligns with industry best practices and positions the codebase for future scalability."
 
 
 def cleanup_git_lock():
