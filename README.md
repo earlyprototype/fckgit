@@ -6,7 +6,7 @@ Stop thinking about git commits. Just code, and let AI handle the rest.
 
 ## ⚠️ Warning: May Cause Horror in Senior Developers
 
-This tool embodies everything your CS professor warned you about:
+This tool is only for cool kids:
 - ❌ No carefully crafted commit messages
 - ❌ No logical commit boundaries  
 - ❌ No `git rebase -i` to clean up history
