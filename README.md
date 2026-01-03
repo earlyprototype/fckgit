@@ -130,9 +130,9 @@ python -m fckgit --once
 
 Use this when you graduate university.
 
-## How It Works (If You Care)
+## How It Works 
 
-File changes → AI reads diff → Generates mess- blahb
+File changes → AI reads diff → Generates commit mess- blahblahblah
 
 ## When Stuff Breaks
 
