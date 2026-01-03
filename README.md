@@ -22,7 +22,7 @@ If you work on a team, for the love of git, **use `--once` mode** and review bef
 
 - 🤖 **AI Does Your Commits** - Gemini write your commit messages so you have more time to focus on your prompt engineering course.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
-- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free tr maxxing.
+- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
 - 🌍 **Works Everywhere** - Windows, Mac, Linux, cafes, hostels, Wetherspoons - We don't discriminate.
