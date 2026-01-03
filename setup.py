@@ -7,7 +7,7 @@ setup(
     author="early_prototype",
     py_modules=["fckgit"],
     install_requires=[
-        "google-generativeai>=0.3.0",
+        "google-genai>=1.0.0",
         "python-dotenv>=0.19.0",
         "watchdog>=2.0.0",
     ],
