@@ -1,5 +1,9 @@
 # fckgit
 
+<p align="center">
+  <img src="assets/banner.png" alt="fckgit - AI commits for extreme vibe-coders" width="800"/>
+</p>
+
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
 Stop wasting time on git commits. Prompt - Accept - Publish. AI to the core, with almost zero visibility
