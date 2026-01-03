@@ -20,7 +20,7 @@ This tool is for cool kids only:
 **"But muh git features!"** - Nerd. 
 
 fckgit unlocks:
-- Extreme Mode 🏄‍♂️ 
+- 2x vibes 🏄‍♂️ 
 - Increased token spend
 - Unlimited IP
 - 
