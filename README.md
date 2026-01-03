@@ -120,7 +120,7 @@ Dependencies install automatically. It just works™.
 
 ## License
 
-MIT. Do whatever you want with it.
+MIT. Do whatever you want with it. Create something actually useful for once. 
 
 ## Contributing
 
