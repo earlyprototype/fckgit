@@ -87,7 +87,7 @@ Clean. Simple. Gets out of your prompts' way.
 python -m fckgit --once
 ```
 
-One commit, then it gets out of your way. Use this when you actually want to use git commands yourself.
+Use this when you actually want to use git commands yourself.
 
 ## How It Works (If You Care)
 
