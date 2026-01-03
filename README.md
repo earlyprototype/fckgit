@@ -113,42 +113,32 @@ File changes → AI reads diff → Generates message → Commits → Pushes.
 
 That's it. It's not rocket science.
 
-## Troubleshooting
+## When Stuff Breaks
 
-### Git Lock File Issues
+**Git lock file errors?**  
+We auto-delete them. You're welcome.
 
-If you see `fatal: Unable to create '.git/index.lock'`:
-- **Auto-fixed!** fckgit now automatically removes stale lock files
-- Or manually: `rm .git/index.lock` (macOS/Linux) or `del .git\index.lock` (Windows)
+**Multiple fckgit instances running?**  
+Yeah, don't do that. Kill the extras with Task Manager.
 
-### Avoiding Lock Files
+**Hit API rate limits?**  
+Free tier gives you 15/min. Take a break, touch grass, come back in 60 seconds.
 
-- Don't run multiple git commands while fckgit is running
-- Use `--once` mode if you need to run other git commands
-- Stop fckgit (Ctrl+C) before running `git pull`, `git rebase`, etc.
+**Using this on a team repo?**  
+Stop. Use `--once` mode or your coworkers will hate you.
 
-### API Rate Limits
+## What You Need
 
-- Gemini 2.5 Flash-Lite free tier: 15 requests/minute
-- The 5-second cooldown prevents hitting limits
-- If you hit limits, just wait a minute and continue
+- Python 3.8+ (you probably have it)
+- Git (obviously)
+- [Free Gemini API key](https://makersuite.google.com/app/apikey)
 
-## Requirements
-
-- Python 3.8+
-- Git
-- [Gemini API key](https://makersuite.google.com/app/apikey) (free tier available)
-
-## Dependencies
-
-- `google-generativeai` - Gemini AI SDK
-- `python-dotenv` - .env file support
-- `watchdog` - File system monitoring
+Dependencies install automatically. It just works™.
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file for details
+MIT. Do whatever you want with it.
 
 ## Contributing
 
-Issues and pull requests welcome! Feel free to improve fckgit.
+Found a bug? Cool, fix it and send a PR. Or don't. We're all adults here.
