@@ -79,7 +79,7 @@ It literally just works:
 📤 Pushed to remote!
 ```
 
-Clean. Simple. Gets out of your way.
+Clean. Simple. Gets out of your AI's way.
 
 ### Single Commit Mode 
 
