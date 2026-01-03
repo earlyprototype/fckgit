@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import time
+from datetime import datetime
 
 # Fix Windows console encoding for emojis
 if sys.platform == 'win32':
