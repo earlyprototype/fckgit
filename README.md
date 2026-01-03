@@ -4,6 +4,13 @@
   <img src="assets/banner.jpg" alt="fckgit - ZERO COMMITS GIVEN" width="100%"/>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/commits-automatic-ff69b4?style=for-the-badge" alt="Automatic Commits"/>
+  <img src="https://img.shields.io/badge/AI-powered-00d4ff?style=for-the-badge" alt="AI Powered"/>
+  <img src="https://img.shields.io/badge/vibes-extreme-00ff00?style=for-the-badge" alt="Extreme Vibes"/>
+  <img src="https://img.shields.io/badge/accountability-zero-red?style=for-the-badge" alt="Zero Accountability"/>
+</p>
+
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
 Stop wasting time on git commits. Prompt - Accept - Publish. AI to the core, with almost zero visibility
@@ -70,6 +77,12 @@ Intern working on MCP (available soon - stop asking).
 
 **Drop it in a .env file:**
 ```bash
+cp .env.example .env
+# Edit .env and add your actual API key
+```
+
+Or just:
+```bash
 echo "GEMINI_API_KEY=your_key_here" > .env
 ```
 
@@ -124,7 +137,10 @@ File changes → AI reads diff → Generates message → Commits → Pushes.
 
 ## When Stuff Breaks
 
-**Git lock file errors?**  
+**Git lock file errors during clone/install?**  
+Windows moment. Just hit 'y' for victory.
+
+**Git lock file errors during commits?**  
 We auto-delete them. You're welcome.
 
 **Multiple fckgit instances running?**  

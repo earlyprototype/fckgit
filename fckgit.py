@@ -237,6 +237,22 @@ def watch_mode():
     print("="*50)
     print()
     
+    # Check for existing changes before starting to watch
+    status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if status_result.stdout.strip():
+        print("🔍 Found existing changes, committing before starting watch...")
+        diff = get_staged_diff() or get_diff()
+        if diff.strip():
+            try:
+                message = generate_message(diff)
+                if message:
+                    if commit(message):
+                        push()
+                        print()
+            except Exception as e:
+                print(f"❌ Error committing existing changes: {e}")
+                print()
+    
     event_handler = GitChangeHandler()
     observer = Observer()
     observer.schedule(event_handler, ".", recursive=True)
