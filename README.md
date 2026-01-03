@@ -124,4 +124,4 @@ MIT. Do whatever you want with it. Create something actually useful for once.
 
 ## Contributing
 
-Found a bug? Cool, fix it and send a PR. Or don't. We're all adults here.
+Found a bug? Cool, fix it and send a PR. Or don't. I don't know what they are.
