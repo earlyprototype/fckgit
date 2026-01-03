@@ -11,12 +11,37 @@
   <img src="https://img.shields.io/badge/accountability-zero-red?style=for-the-badge" alt="Zero Accountability"/>
 </p>
 
-Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
+Rapid-fire auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
 Stop wasting time on git commits. **Prompt - Accept - Publish to Main.** 
 
-AI to the core, with almost zero visibility.
+### 2026 Update: MCP server drop!
+fckgit now includes an MCP (Model Context Protocol) server so AI assistants can auto-commit your code directly.
 
+** New MCP-only Exclusive Tools**
+- **SILICON VALLEY** - Make commits sound FAANG professional (`fckgit_silicon_valley`)
+- **PROFESSIONALIZE** - Transform casual messages to enterprise-grade (`fckgit_professionalize`)
+
+---
+_AI to the core, with almost zero visibility._
+---
+
+## Features 
+
+- 🤖 **AI Does Your Commits** - Gemini writes your commit messages so you have more time to focus on your Newsletter.
+- 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
+- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
+- 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
+- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
+- 🌍 **Works Everywhere** - Windows, iPad, Linux
+
+## fckgit unlocks:
+- Up to 3x vibes 🏄‍♂️ 
+- Increased token spend at zero cost to you
+- FAANG literacy
+- Founder mode
+- Dopamine and optimism
+  
 ## ⚠️ Warning 
 
 - ❌ No carefully crafted commit messages
@@ -27,22 +52,6 @@ AI to the core, with almost zero visibility.
 - ✅ Maximum speed 
 
 
-## fckgit unlocks:
-- Up to 3x vibes 🏄‍♂️ 
-- Increased token spend at zero cost to you
-- FAANG literacy
-- Founder mode
-- LLM psychosis
-
-
-## Features 
-
-- 🤖 **AI Does Your Commits** - Gemini writes your commit messages so you have more time to focus on your Newsletter.
-- 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
-- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
-- 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
-- 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
-- 🌍 **Works Everywhere** - Windows, iPad, Linux
 
 ## Installation (One Click - It's Safe!)
 
