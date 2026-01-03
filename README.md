@@ -27,7 +27,7 @@ This tool is for cool kids only:
 **"But muh git features!"** - Nerd. 
 
 fckgit unlocks:
-- 10x vibes 🏄‍♂️ 
+- Up to 10x vibes 🏄‍♂️ 
 - Increased token spend
 - Unlimited IP
 - Founder mode
