@@ -52,7 +52,7 @@ cd fckgit
 .\install.ps1
 ```
 
-**Option 2: Manual Install**
+**Option 2: Slow and Boring Manual Install**
 
 ```bash
 git clone https://github.com/earlyprototype/fckgit.git
