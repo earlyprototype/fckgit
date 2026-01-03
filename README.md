@@ -220,7 +220,7 @@ Stop that immediately. `--once` mode only permitted during hackathons.
 - Git (don't ask)
 - [Free Gemini API key](https://makersuite.google.com/app/apikey)
 
-Dependencies install automatically. It just works™ (unlike your scripts).
+Dependencies install automatically. It just works™.
 
 ## License
 
