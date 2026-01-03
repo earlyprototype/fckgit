@@ -10,7 +10,7 @@ This tool is only for cool kids:
 - ❌ No carefully crafted commit messages
 - ❌ No logical commit boundaries  
 - ❌ No `git rebase -i` to clean up history
-- ❌ Commits literally everything you save
+- ❌ Commits literally everything you touch
 - ✅ Maximum laziness achieved
 
 **"But muh git features!"** - Shut up Nerd. This tool is for:

@@ -131,7 +131,7 @@ class GitChangeHandler(FileSystemEventHandler):
     
     def __init__(self):
         self.last_commit_time = 0
-        self.cooldown = 5  # seconds between commits
+        self.cooldown = 30  # seconds between commits
         
     def should_process(self, event):
         """Check if we should process this event."""
