@@ -13,7 +13,7 @@
 
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
-Stop wasting time on git commits. **Prompt - Accept - Publish to Main. 
+Stop wasting time on git commits. **Prompt - Accept - Publish to Main.** 
 
 AI to the core, with almost zero visibility.
 
@@ -132,7 +132,7 @@ Use this when you graduate university.
 
 ## How It Works 
 
-File changes → AI reads diff → Generates commit mess- blahblahblah
+File changes → AI reads diff → Main
 
 ## When Stuff Breaks
 
