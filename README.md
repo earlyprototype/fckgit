@@ -29,7 +29,7 @@ AI to the core, with almost zero visibility.
 fckgit unlocks:
 - Up to 2x vibes 🏄‍♂️ 
 - Increased token spend at zero cost to you
-- Unlimited IP
+- VC ready IP
 - Founder mode
 
 
@@ -157,7 +157,7 @@ Stop that immediately. `--once` mode only permitted during hackathons.
 - Git (don't ask)
 - [Free Gemini API key](https://makersuite.google.com/app/apikey)
 
-Dependencies install automatically. It just works™ (unlike your scr).
+Dependencies install automatically. It just works™ (unlike your scripts).
 
 ## License
 
