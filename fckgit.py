@@ -71,8 +71,22 @@ Output ONLY the commit message, nothing else."""
     return response.text.strip().strip('"').strip("'")
 
 
+def cleanup_git_lock():
+    """Remove stale git lock file if it exists."""
+    lock_file = ".git/index.lock"
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+            print("🔧 Removed stale git lock file")
+        except Exception:
+            pass  # Ignore if we can't remove it
+
+
 def commit(message: str) -> bool:
     """Stage all changes and commit."""
+    # Clean up any stale locks first
+    cleanup_git_lock()
+    
     subprocess.run(["git", "add", "-A"], capture_output=True)
     result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode == 0:
