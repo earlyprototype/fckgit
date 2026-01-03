@@ -118,7 +118,7 @@ Dependencies install automatically. It just works™ (unlike you).
 
 ## License
 
-MIT. Do whatever you want with it. Create something actually useful for once. 
+MIT. Do whatever you want with it. Create something actually useful. 
 
 ## Contributing
 
