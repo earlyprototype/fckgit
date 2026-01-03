@@ -108,7 +108,7 @@ Yeah, don't do that. Kill the extras with Task Manager.
 Free tier gives you 15/min. Take a break, touch grass, come back in 60 seconds.
 
 **Using this on a team repo?**  
-Stop. Use `--once` mode or your hackathon team will hate you.
+Stop. Use `--once` mode or your hackathon teammates will hate you.
 
 ## What You Need
 
