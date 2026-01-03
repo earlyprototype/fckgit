@@ -13,7 +13,9 @@
 
 Auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
-Stop wasting time on git commits. Prompt - Accept - Publish. AI to the core, with almost zero visibility
+Stop wasting time on git commits. Prompt - Accept - Publish. 
+
+AI to the core, with almost zero visibility
 
 ## ⚠️ Warning
 
@@ -28,7 +30,7 @@ This tool is for cool kids only:
 
 fckgit unlocks:
 - Up to 10x vibes 🏄‍♂️ 
-- Increased token spend
+- Increased token spend at zero cost to you
 - Unlimited IP
 - Founder mode
 
