@@ -53,9 +53,9 @@ _AI to the core, with almost zero visibility._
 
 
 
-## Installation (One Click - It's Safe!)
+## Installation 
 
-**Option 1: Automated Install (Recommended)**
+**Option 1: Automated Install (Click and Collect - Recommended)**
 
 ```bash
 # iPad/Linux
