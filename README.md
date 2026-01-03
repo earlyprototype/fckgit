@@ -13,11 +13,8 @@ This tool is only for cool kids:
 - ❌ Commits literally everything you save
 - ✅ Maximum laziness achieved
 
-**"But muh git features!"** - Shut up . This tool is for:
-- Solo projects where you're the only one reading the history
-- Prototypes where "ship it" > "perfect history"
-- Developers who'd rather write code than write commit messages
-- People honest enough to admit they `git commit -m "fix"` anyway
+**"But muh git features!"** - Shut up Nerd. This tool is for:
+- solo
 
 If you work on a team, for the love of git, **use `--once` mode** and review before pushing. Or don't. We're not your parents.
 
