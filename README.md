@@ -20,7 +20,7 @@ This tool is for cool kids only:
 **"But muh git features!"** - Nerd. 
 
 fckgit unlocks:
-- Extreme coding🏄‍♂️ 
+- Extreme Mode🏄‍♂️ 
 - Subscribers
 - Increased token spend
 - VC potential
