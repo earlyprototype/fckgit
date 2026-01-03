@@ -23,7 +23,7 @@ fckgit unlocks:
 - 2x vibes 🏄‍♂️ 
 - Increased token spend
 - Unlimited IP
-- 
+- Founder mode
 
 
 ## Features 
