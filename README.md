@@ -20,7 +20,7 @@ If you work on a team, for the love of git, **use `--once` mode** and review bef
 
 ## Features (Yeah, We Got 'Em)
 
-- 🤖 **AI Does Your Commits** - Gemini write your messages. Better than your "fix stuff" commits.
+- 🤖 **AI Does Your Commits** - Gemini write your commit messages. Better than your "fix stuff" commits.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally just save and it's done.
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Your free tier goes far.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because git is moody.
