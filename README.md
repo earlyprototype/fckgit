@@ -17,8 +17,7 @@ This tool is only for cool kids:
 - Extreme solo vibe-coders only🏄‍♂️ 
 
 
-
-## Features (Yeah, We Got 'Em)
+## Features 
 
 - 🤖 **AI Does Your Commits** - Gemini write your commit messages so you have more time to focus on your prompt engineering course.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
