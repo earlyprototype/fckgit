@@ -47,7 +47,7 @@ fckgit unlocks:
 **Option 1: Automated Install (Recommended)**
 
 ```bash
-# Mac/Linux
+# iPad/Linux
 git clone https://github.com/earlyprototype/fckgit.git
 cd fckgit
 chmod +x install.sh
