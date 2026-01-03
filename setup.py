@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name="fckgit",
-    version="0.1.0",
-    description="Auto-commit with AI-generated messages using Gemini",
+    version="0.2.0",
+    description="Auto-commit with AI-generated messages using Gemini - Now with Silicon Valley Mode!",
     author="early_prototype",
     py_modules=["fckgit"],
     packages=find_packages(),
