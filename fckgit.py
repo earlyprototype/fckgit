@@ -157,16 +157,17 @@ class GitChangeHandler(FileSystemEventHandler):
         # Small delay to ensure file writes are complete
         time.sleep(0.5)
         
-        # Check if there are actually any changes
+        # Check if there are actually any changes in git
         status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, encoding='utf-8', errors='replace')
         if not status_result.stdout.strip():
-            # No changes, silently skip
+            # No changes in git, silently skip (likely temp files or already committed)
             return
         
-        # Get diff
+        # Double-check with diff
         diff = get_staged_diff() or get_diff()
         
         if not diff.strip():
+            # No actual diff content, skip
             return
         
         print("\n" + "="*50)
@@ -178,6 +179,11 @@ class GitChangeHandler(FileSystemEventHandler):
             if message:
                 if commit(message):
                     push()
+                else:
+                    # Commit failed - check if it's because nothing to commit
+                    status_check = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+                    if not status_check.stdout.strip():
+                        print("ℹ️  (Changes were already committed)")
             else:
                 print("❌ Failed to generate commit message.")
         except Exception as e:
