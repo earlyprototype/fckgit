@@ -73,40 +73,34 @@ That's it. No docker containers, no kubernetes, no viruses.
 
 fckgit now includes an MCP (Model Context Protocol) server so AI assistants can auto-commit your code directly.
 
-**Install MCP dependencies:**
+**Quick Setup:**
+
 ```bash
+# Install MCP support
 pip install mcp>=1.0.0
+
+# Test it works
+python test_mcp.py
 ```
 
-**Configuration for Cursor (or any MCP client):**
+**Configuration:**
 
-Add to your MCP settings file (e.g., `.cursorrules` or MCP config):
+See [MCP_SETUP.md](MCP_SETUP.md) for complete setup instructions for:
+- Cursor IDE
+- Claude Desktop
+- Other MCP clients
 
-```json
-{
-  "mcpServers": {
-    "fckgit": {
-      "command": "python",
-      "args": ["-m", "mcp_server"],
-      "cwd": "/path/to/fckgit",
-      "env": {
-        "GEMINI_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
+**Available Tools:**
 
-**Available MCP Tools:**
+Your AI assistant can now:
+- Check git status (`fckgit_status`)
+- Generate commit messages (`fckgit_generate_message`)
+- Auto-commit with AI messages (`fckgit_commit`)
+- Commit with custom messages (`fckgit_commit_with_message`)
+- Push to remote (`fckgit_push`)
+- Clean up lock files (`fckgit_cleanup_lock`)
 
-- `fckgit_status` - Get current git status and optionally the diff
-- `fckgit_generate_message` - Generate AI commit message without committing
-- `fckgit_commit` - Auto-commit with AI-generated message (optional auto-push)
-- `fckgit_commit_with_message` - Commit with a specific message
-- `fckgit_push` - Push to remote (handles conflicts with auto-rebase)
-- `fckgit_cleanup_lock` - Clean up stale git lock files
-
-Your AI can now commit and push your code. What could go wrong?
+What could possibly go wrong?
 
 ## Setup (Takes 30 Seconds)
 

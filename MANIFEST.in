@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+include MCP_SETUP.md
+include .env.example
+include mcp_config_example.json
+recursive-include mcp_server *.py
