@@ -63,7 +63,7 @@ python -m fckgit
 
 It literally just works:
 - Watches everything
-- You save, it commits
+- You code, it commits
 - AI writes the message
 - Auto-pushes to GitHub
 - 5 second cooldown so you don't spam
