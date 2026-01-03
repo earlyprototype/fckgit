@@ -132,8 +132,7 @@ Use this when you graduate university.
 
 ## How It Works (If You Care)
 
-File changes → AI reads diff → Generates message → Commits → Pushes. 
-
+File changes → AI reads diff → Generates mess- blahb
 
 ## When Stuff Breaks
 
