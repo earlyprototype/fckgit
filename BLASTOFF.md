@@ -152,7 +152,7 @@ AI: *uses fckgit_stop_watch*
 ### Use Blastoff When:
 - Maximum automation desired
 - Rapid prototyping
-- Solo development
+- You're a vibe warrior
 - Don't care about commit history
 - Want to focus on coding, not committing
 

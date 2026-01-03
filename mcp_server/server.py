@@ -468,6 +468,39 @@ async def handle_list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {}
             }
+        ),
+        types.Tool(
+            name="fckgit_silicon_valley",
+            description="SILICON VALLEY MODE - Generate a FAANG-tier professional commit message that makes your code sound enterprise-ready. Transforms casual changes into impressive, buzzword-rich commits.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "push": {
+                        "type": "boolean",
+                        "description": "Automatically push after committing",
+                        "default": False
+                    },
+                    "stage_all": {
+                        "type": "boolean",
+                        "description": "Stage all changes before committing",
+                        "default": True
+                    }
+                }
+            }
+        ),
+        types.Tool(
+            name="fckgit_professionalize",
+            description="Transform an existing casual commit message into a FAANG-tier professional one. Makes it sound like a Staff Engineer wrote it.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "The casual commit message to professionalize"
+                    }
+                },
+                "required": ["message"]
+            }
         )
     ]
 
@@ -602,6 +635,53 @@ async def handle_call_tool(
     elif name == "fckgit_watch_status":
         is_running, message = get_watch_status()
         return [types.TextContent(type="text", text=message)]
+    
+    elif name == "fckgit_silicon_valley":
+        push = arguments.get("push", False)
+        stage_all = arguments.get("stage_all", True)
+        
+        # Get diff for message generation
+        if stage_all:
+            # Stage first so we can see untracked files
+            run_git_command(["git", "add", "-A"])
+        
+        diff = get_staged_diff() or get_diff()
+        
+        if not diff.strip():
+            return [types.TextContent(type="text", text="No changes to commit")]
+        
+        # Generate FAANG-tier professional message
+        message = generate_silicon_valley_message(diff)
+        
+        # Commit
+        success, result_msg = commit_changes(message, stage_all=False)  # Already staged
+        
+        if not success:
+            return [types.TextContent(type="text", text=result_msg)]
+        
+        result = "SILICON VALLEY MODE ACTIVATED\n\n" + result_msg
+        
+        # Push if requested
+        if push:
+            push_success, push_msg = push_to_remote()
+            result += f"\n{push_msg}"
+        
+        return [types.TextContent(type="text", text=result)]
+    
+    elif name == "fckgit_professionalize":
+        casual_message = arguments.get("message")
+        
+        if not casual_message:
+            return [types.TextContent(type="text", text="Error: message is required")]
+        
+        # Transform to professional
+        professional_message = professionalize_message(casual_message)
+        
+        result = f"CASUAL MESSAGE:\n{casual_message}\n\n"
+        result += f"PROFESSIONAL VERSION:\n{professional_message}\n\n"
+        result += "Use fckgit_commit_with_message if you want to commit with this professional message."
+        
+        return [types.TextContent(type="text", text=result)]
     
     else:
         return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
