@@ -11,7 +11,7 @@ This tool is only for cool kids:
 - ❌ No logical commit boundaries  
 - ❌ No `git rebase -i` to clean up history
 - ❌ Commits literally everything you touch
-- ✅ Maximum laziness achieved
+- ✅ Maximum speed achieved
 
 **"But muh git features!"** - Shut up Nerd. This tool is for:
 - Extreme solo vibe-coders only🏄‍♂️ 
