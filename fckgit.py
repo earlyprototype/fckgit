@@ -14,7 +14,6 @@ if sys.platform == 'win32':
 
 try:
     from google import genai
-    from google.genai import types
 except ImportError:
     print("❌ google-genai not installed. Run: pip install google-genai")
     sys.exit(1)

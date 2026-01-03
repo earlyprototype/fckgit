@@ -32,7 +32,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Cyan
     Write-Host "1. Get your free Gemini API key: https://makersuite.google.com/app/apikey"
-    Write-Host "2. Create .env file: echo 'GEMINI_API_KEY=your_key_here' > .env"
+    Write-Host "2. Create .env file: Copy .env.example to .env (then add your key)"
     Write-Host "3. Run: python -m fckgit"
     Write-Host ""
     Write-Host "🚀 Now go write some code. fckgit handles the rest." -ForegroundColor Green
