@@ -87,12 +87,13 @@ def commit(message: str) -> bool:
 def push():
     """Push to remote repository."""
     print("📤 Pushing to remote...")
-    result = subprocess.run(["git", "push"], capture_output=True, text=True)
+    result = subprocess.run(["git", "push"], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode == 0:
         print("✓ Pushed to remote!")
         return True
     else:
-        print(f"❌ Push failed: {result.stderr}")
+        error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+        print(f"❌ Push failed: {error_msg}")
         return False
 
 
