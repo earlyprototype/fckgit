@@ -218,8 +218,23 @@ def watch_mode():
         print("❌ watchdog not installed. Run: pip install watchdog")
         sys.exit(1)
     
-    print("👀 Watching for changes... (Press Ctrl+C to stop)")
-    print("   Will auto-commit and push when files are saved.")
+    # Get current branch
+    branch_result = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
+    branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "unknown"
+    
+    # Get repo name
+    repo_path = os.getcwd()
+    repo_name = os.path.basename(repo_path)
+    
+    start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    print("="*50)
+    print("👀 fckgit - Auto-commit watcher started")
+    print(f"   Repository: {repo_name}")
+    print(f"   Branch: {branch}")
+    print(f"   Started: {start_time}")
+    print(f"   Press Ctrl+C to stop")
+    print("="*50)
     print()
     
     event_handler = GitChangeHandler()
