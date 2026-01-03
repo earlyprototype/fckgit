@@ -24,7 +24,7 @@ This tool is for cool kids only:
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
 - 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files. For when you get an intern.
-- 🌍 **Works Everywhere** - Windows, Mac, Linux, cafes, hostels, your parent's
+- 🌍 **Works Everywhere** - Windows, Mac, Linux, cafes, hostels, your parent's place
 
 ## Installation 
 
