@@ -70,14 +70,13 @@ export GEMINI_API_KEY="your_key_here"
 python -m fckgit
 ```
 
-What happens:
-- 👀 Watches all files in your repository
-- 💾 Detects changes when you save files
-- 🤖 Generates smart commit messages with AI
-- ✅ Stages, commits, and pushes automatically
-- ⏱️ 5-second cooldown between commits
-- 📊 Shows timestamps, commit hashes, and changed files
-- 🛑 Press `Ctrl+C` to stop watching
+It literally just works:
+- Watches everything
+- You save, it commits
+- AI writes the message
+- Auto-pushes to GitHub
+- 5 second cooldown so you don't spam
+- `Ctrl+C` when you're done being productive
 
 **Example output:**
 ```
@@ -100,22 +99,19 @@ What happens:
 ==================================================
 ```
 
-### Single Commit Mode
+### Single Commit Mode (For Control Freaks)
 
 ```bash
-# Run once for current changes:
 python -m fckgit --once
 ```
 
-Use this when you want manual control or need to run other git commands between commits.
+One commit, then it gets out of your way. Use this when you actually want to use git commands yourself.
 
-## How It Works
+## How It Works (If You Care)
 
-1. **Detects Changes** - Watches file system events or checks git status
-2. **Analyzes Diff** - Reads `git diff` output
-3. **Generates Message** - Sends diff to Gemini 2.5 Flash-Lite
-4. **Commits** - Stages all changes and commits with AI message
-5. **Pushes** - Automatically pushes to remote repository
+File changes → AI reads diff → Generates message → Commits → Pushes. 
+
+That's it. It's not rocket science.
 
 ## Troubleshooting
 
