@@ -19,6 +19,8 @@ This tool is for cool kids only:
 
 **"But muh git features!"** - Shut up Nerd. fckgit unlocks:
 - Extreme vibe-coding🏄‍♂️ 
+- Subscribers
+- 
 
 
 ## Features 
