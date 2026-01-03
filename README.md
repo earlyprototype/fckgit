@@ -32,7 +32,7 @@ _AI to the core, with almost zero visibility._
 - 🤖 **AI Does Your Commits** - Gemini writes your commit messages so you have more time to focus on your Newsletter.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
-- 🔧 **Handles Git's BS** - Cleans up lock files automatically because you don't know how to.
+- 🔧 **Handles Git's BS** - Mercifully cleans up lock files automatically.
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files for Product Managers.
 - 🌍 **Works Everywhere** - Windows, iPad, Linux
 
