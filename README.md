@@ -21,6 +21,7 @@ This tool is for cool kids only:
 - Extreme vibe-coding🏄‍♂️ 
 - Subscribers
 - Increased token spend
+- VC potential
 
 
 ## Features 
