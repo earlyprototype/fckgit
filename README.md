@@ -51,7 +51,7 @@ echo "GEMINI_API_KEY=your_key_here" > .env
 
 Or export it if you're fancy:
 ```bash
-export GEMINI_API_KEY="your_key_here"  # Mac/Linux
+export GEMINI_API_KEY="your_key_here"  # iPad/Linux
 $env:GEMINI_API_KEY="your_key_here"    # Windows
 ```
 
