@@ -111,7 +111,7 @@ Stop. Use `--once` mode or your hackathon teammates will hate you.
 ## What You Need
 
 - Python 3.8+ (you probably have it)
-- Git (obviously)
+- Git (don't ask)
 - [Free Gemini API key](https://makersuite.google.com/app/apikey)
 
 Dependencies install automatically. It just works™.
