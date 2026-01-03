@@ -185,8 +185,13 @@ class GitChangeHandler(FileSystemEventHandler):
             # No actual diff content, skip
             return
         
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        changed_files = [line.split()[-1] for line in status_result.stdout.strip().split('\n') if line.strip()]
+        
         print("\n" + "="*50)
-        print("🔍 Changes detected! Analyzing...")
+        print(f"🔍 Changes detected at {timestamp}")
+        print(f"   Files: {', '.join(changed_files[:3])}{' ...' if len(changed_files) > 3 else ''}")
+        print("   Analyzing with AI...")
         
         try:
             message = generate_message(diff)
