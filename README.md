@@ -15,10 +15,11 @@ Rapid-fire auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
 Stop wasting time on git commits. **Prompt - Accept - Publish to Main.** 
 
+---
 ### 2026 Update: MCP server drop!
 fckgit now includes an MCP (Model Context Protocol) server so AI assistants can auto-commit your code directly.
 
-** New MCP-only Exclusive Tools**
+**New MCP-only Exclusive Tools**
 - **SILICON VALLEY** - Make commits sound FAANG professional (`fckgit_silicon_valley`)
 - **PROFESSIONALIZE** - Transform casual messages to enterprise-grade (`fckgit_professionalize`)
 
