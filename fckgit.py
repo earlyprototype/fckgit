@@ -93,9 +93,15 @@ def commit(message: str) -> bool:
         print(f"✓ Committed: {message}")
         return True
     else:
+        # Check if the error is just "nothing to commit"
         error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
-        print(f"❌ Commit failed: {error_msg}")
-        return False
+        if "nothing to commit" in error_msg.lower():
+            # This is expected when files were already committed
+            return False
+        else:
+            # This is a real error
+            print(f"❌ Commit failed: {error_msg}")
+            return False
 
 
 def push():
