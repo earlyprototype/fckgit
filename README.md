@@ -69,7 +69,44 @@ pip install .
 
 That's it. No docker containers, no kubernetes, no viruses. 
 
-## MCP (available soon - stop asking).
+## MCP Server
+
+fckgit now includes an MCP (Model Context Protocol) server so AI assistants can auto-commit your code directly.
+
+**Install MCP dependencies:**
+```bash
+pip install mcp>=1.0.0
+```
+
+**Configuration for Cursor (or any MCP client):**
+
+Add to your MCP settings file (e.g., `.cursorrules` or MCP config):
+
+```json
+{
+  "mcpServers": {
+    "fckgit": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/fckgit",
+      "env": {
+        "GEMINI_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Available MCP Tools:**
+
+- `fckgit_status` - Get current git status and optionally the diff
+- `fckgit_generate_message` - Generate AI commit message without committing
+- `fckgit_commit` - Auto-commit with AI-generated message (optional auto-push)
+- `fckgit_commit_with_message` - Commit with a specific message
+- `fckgit_push` - Push to remote (handles conflicts with auto-rebase)
+- `fckgit_cleanup_lock` - Clean up stale git lock files
+
+Your AI can now commit and push your code. What could go wrong?
 
 ## Setup (Takes 30 Seconds)
 
