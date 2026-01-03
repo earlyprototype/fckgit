@@ -166,3 +166,21 @@ MIT. Do whatever you want with it. Create something actually useful even.
 ## Contributing
 
 Found a bug? Cool, fix it and send a PR. Or don't. I don't know what they are.
+
+---
+
+<p align="center">
+  <a href="https://github.com/earlyprototype/fckgit/stargazers">
+    <img src="https://img.shields.io/github/stars/earlyprototype/fckgit?style=social" alt="GitHub stars"/>
+  </a>
+  <a href="https://github.com/earlyprototype/fckgit/network/members">
+    <img src="https://img.shields.io/github/forks/earlyprototype/fckgit?style=social" alt="GitHub forks"/>
+  </a>
+  <a href="https://github.com/earlyprototype/fckgit/issues">
+    <img src="https://img.shields.io/github/issues/earlyprototype/fckgit" alt="GitHub issues"/>
+  </a>
+</p>
+
+<p align="center">
+  <strong>If this saved you 30 seconds, smash that star button ⭐</strong>
+</p>
