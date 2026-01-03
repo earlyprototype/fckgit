@@ -35,7 +35,7 @@ cd fckgit
 pip install .
 ```
 
-That's it. No docker containers, no kubernetes, no build scripts. We'll probably have an MCP at some stage.
+That's it. No docker containers, no kubernetes, no build scripts. Intern.
 
 ## Setup (Takes 30 Seconds)
 
