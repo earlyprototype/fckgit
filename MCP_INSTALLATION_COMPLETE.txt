@@ -7,6 +7,12 @@ Your abomination now has full MCP (Model Context Protocol) server capabilities!
 AI assistants can now commit and push your code directly. Maximum automation,
 minimum accountability. Just as it should be.
 
+PLUS: Silicon Valley mode is now available in the standalone tool with --faang!
+
+Usage:
+  python -m fckgit --faang           (watch mode with professional commits)
+  python -m fckgit --once --faang    (single professional commit)
+
 ================================================================================
                               FILES CREATED
 ================================================================================

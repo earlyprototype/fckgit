@@ -1,0 +1,232 @@
+================================================================================
+                    --faang FLAG ADDED TO STANDALONE TOOL
+================================================================================
+
+Silicon Valley mode is now available in the standalone fckgit tool with the 
+--faang flag. No MCP server needed!
+
+================================================================================
+                              USAGE
+================================================================================
+
+Watch Mode (Professional commits on every change):
+  python -m fckgit --faang
+
+Single Commit (One professional commit):
+  python -m fckgit --once --faang
+
+Regular Mode (for comparison):
+  python -m fckgit
+  python -m fckgit --once
+
+================================================================================
+                           WHAT IT DOES
+================================================================================
+
+Transforms your commits from embarrassing to enterprise-grade:
+
+WITHOUT --faang:
+  "fix: stuff works now"
+
+WITH --faang:
+  fix: Resolve critical system stability issues
+  
+  Addressed underlying architectural concerns that were impacting system
+  reliability. This fix improves fault tolerance and ensures consistent
+  behavior under edge-case scenarios, enhancing overall platform stability.
+
+================================================================================
+                          CODE CHANGES
+================================================================================
+
+Modified Files:
+  - fckgit.py:
+    * Added generate_silicon_valley_message() function
+    * Updated generate_message() to accept faang_mode parameter
+    * Updated GitChangeHandler to accept and use faang_mode
+    * Updated watch_mode() to accept faang_mode parameter
+    * Added --faang flag to argument parser
+    * Shows "SILICON VALLEY MODE" indicators when active
+
+Documentation:
+  - README.md - Added --faang usage examples
+  - SILICON_VALLEY.md - Updated with standalone usage
+  - CHANGELOG.md - Documented v0.2.0 changes
+  - FAANG_FLAG_USAGE.md - Complete usage guide (NEW)
+
+================================================================================
+                         TECHNICAL DETAILS
+================================================================================
+
+Function Signatures Changed:
+  - generate_message(diff: str, faang_mode: bool = False)
+  - watch_mode(faang_mode: bool = False)
+  - GitChangeHandler.__init__(faang_mode: bool = False)
+
+New Function:
+  - generate_silicon_valley_message(diff: str) -> str
+    Uses same Gemini 2.5 Flash-Lite model
+    Generates multi-line commits with technical rationale
+    Includes enterprise buzzwords
+
+AI Prompt Engineering:
+  Professional mode uses enhanced prompt with:
+    - "You are a senior engineer at a FAANG company"
+    - Enterprise buzzword requirements
+    - Technical rationale body paragraph
+    - "Make even trivial changes sound important"
+
+================================================================================
+                           EXAMPLES
+================================================================================
+
+Example 1: Watch Mode with --faang
+
+  Command:
+    python -m fckgit --faang
+  
+  Output:
+    ==================================================
+    👀 fckgit - Auto-commit watcher started (SILICON VALLEY MODE)
+       Repository: my-project
+       Branch: main
+       Mode: FAANG Professional
+       Started: 2026-01-03 14:32:00
+       Press Ctrl+C to stop
+    ==================================================
+    
+    🔍 Changes detected at 2026-01-03 14:32:15
+       Files: app.py
+       Analyzing with AI... (SILICON VALLEY MODE)
+    ✓ Committed: refactor: Enhance system architecture...
+      [abc1234] at 14:32:17
+    📤 Pushed to remote!
+    ==================================================
+
+Example 2: Single Commit with --faang
+
+  Command:
+    python -m fckgit --once --faang
+  
+  Output:
+    🔍 Analyzing changes... (SILICON VALLEY MODE)
+    ✓ Committed: feat: Implement comprehensive observability infrastructure
+    
+    Enhanced system monitoring capabilities through strategic logging
+    implementation. This improvement provides critical insights into
+    system behavior, enabling proactive issue detection.
+      [def5678] at 14:35:42
+    📤 Pushed to remote!
+
+================================================================================
+                      DIFFERENCES: REGULAR VS --faang
+================================================================================
+
+Aspect                 | Regular fckgit      | --faang Mode
+-----------------------|---------------------|---------------------------
+Message length         | Single line         | Multi-line with body
+Buzzwords              | Minimal             | Maximum
+Professionalism        | Casual              | Enterprise-grade
+Technical rationale    | None                | Detailed paragraph
+Commit examples        | "fix: bug"          | "fix: Resolve critical..."
+
+================================================================================
+                           WHEN TO USE
+================================================================================
+
+Use --faang When:
+  - Recruiters might check your GitHub
+  - Sharing repo with manager/team
+  - Open source projects
+  - Building portfolio
+  - Job hunting
+  - Need to look professional
+
+Use Regular Mode When:
+  - Solo project
+  - Nobody will see it
+  - 3am coding session
+  - Being honest
+  - Speed matters
+
+================================================================================
+                          AVAILABILITY
+================================================================================
+
+Standalone Tool:  ✓ --faang flag (NEW!)
+MCP Server:       ✓ fckgit_silicon_valley tool
+                  ✓ fckgit_professionalize tool
+
+All use the same underlying generate_silicon_valley_message() function.
+
+================================================================================
+                            ALIASES
+================================================================================
+
+You can create an alias for easier use:
+
+Bash/Zsh:
+  echo 'alias fckgit-pro="python -m fckgit --faang"' >> ~/.bashrc
+  source ~/.bashrc
+  
+  # Then just run:
+  fckgit-pro
+
+PowerShell:
+  function fckgit-pro { python -m fckgit --faang }
+  
+  # Then just run:
+  fckgit-pro
+
+================================================================================
+                          DOCUMENTATION
+================================================================================
+
+Complete guides:
+  - FAANG_FLAG_USAGE.md - Standalone flag usage
+  - SILICON_VALLEY.md - Overall Silicon Valley mode guide
+  - README.md - Updated with --faang examples
+  - CHANGELOG.md - Version 0.2.0 changes
+
+================================================================================
+                           TESTING
+================================================================================
+
+To test immediately:
+
+1. Make a small change to any file
+2. Run: python -m fckgit --once --faang
+3. Check your commit message
+
+Or test watch mode:
+
+1. Run: python -m fckgit --faang
+2. Edit a file
+3. Watch it auto-commit with professional message
+4. Ctrl+C to stop
+
+================================================================================
+                           SUMMARY
+================================================================================
+
+The --faang flag brings Silicon Valley mode to the standalone tool:
+
+✓ Works in watch mode and --once mode
+✓ Same Gemini 2.5 Flash-Lite model (no extra cost)
+✓ Multi-line commits with technical rationale
+✓ Enterprise buzzwords automatically included
+✓ Makes trivial changes sound important
+✓ Perfect for when people are watching your commits
+
+Command:
+  python -m fckgit --faang
+
+Your commits will now sound like they came from a Staff Engineer at Google.
+
+================================================================================
+
+Not responsible for any promotions based on commit message quality.
+
+MIT License - Use it to impress recruiters or fool your manager.
+
+================================================================================

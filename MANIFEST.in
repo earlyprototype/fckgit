@@ -5,6 +5,7 @@ include MCP_README.md
 include SILICON_VALLEY.md
 include BLASTOFF.md
 include CHANGELOG.md
+include FAANG_FLAG_USAGE.md
 include .env.example
 include mcp_config_example.json
 recursive-include mcp_server *.py
