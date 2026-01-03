@@ -1,4 +1,5 @@
 # fckgit MCP Server Installation Script for Windows
+# Located in: scripts/install_mcp.ps1
 # Run this after installing fckgit to add MCP support
 
 Write-Host "========================================" -ForegroundColor Cyan

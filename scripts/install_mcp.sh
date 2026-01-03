@@ -1,5 +1,6 @@
 #!/bin/bash
-# fckgit MCP Server Installation Script for Mac/Linux
+# fckgit MCP Server Installation Script for iPad/Linux
+# Located in: scripts/install_mcp.sh
 # Run this after installing fckgit to add MCP support
 
 echo "========================================"

@@ -50,13 +50,13 @@ fckgit unlocks:
 # iPad/Linux
 git clone https://github.com/earlyprototype/fckgit.git
 cd fckgit
-chmod +x install.sh
-./install.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 
 # Windows PowerShell
 git clone https://github.com/earlyprototype/fckgit.git
 cd fckgit
-.\install.ps1
+.\scripts\install.ps1
 ```
 
 **Option 2: Difficult and Boring Manual Install**
