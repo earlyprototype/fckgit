@@ -38,27 +38,19 @@ cd fckgit
 pip install .
 ```
 
-## Setup
+## Setup (Takes 30 Seconds)
 
-### 1. Get a Gemini API Key
+**Get API key:** [Google AI Studio](https://makersuite.google.com/app/apikey) (it's free, relax)
 
-Get your free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-
-### 2. Configure the API Key
-
-**Option A: Using .env file (recommended)**
+**Drop it in a .env file:**
 ```bash
-# Create a .env file in your project
 echo "GEMINI_API_KEY=your_key_here" > .env
 ```
 
-**Option B: Environment variable**
+Or export it if you're fancy:
 ```bash
-# Windows PowerShell
-$env:GEMINI_API_KEY="your_key_here"
-
-# macOS/Linux
-export GEMINI_API_KEY="your_key_here"
+export GEMINI_API_KEY="your_key_here"  # Mac/Linux
+$env:GEMINI_API_KEY="your_key_here"    # Windows
 ```
 
 ## Usage
