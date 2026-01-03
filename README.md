@@ -13,7 +13,7 @@ This tool is only for cool kids:
 - ❌ Commits literally everything you save
 - ✅ Maximum laziness achieved
 
-**"But muh git best practices!"** - Yeah, we know. This tool is for:
+**"But muh git features!"** - Yeah, we know. This tool is for:
 - Solo projects where you're the only one reading the history
 - Prototypes where "ship it" > "perfect history"
 - Developers who'd rather write code than write commit messages
