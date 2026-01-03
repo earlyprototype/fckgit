@@ -85,7 +85,7 @@ python test_mcp.py
 
 **Configuration:**
 
-See [MCP_SETUP.md](MCP_SETUP.md) for complete setup instructions for:
+See [MCP_SETUP.md](docs/mcp/MCP_SETUP.md) for complete setup instructions for:
 - Cursor IDE
 - Claude Desktop
 - Other MCP clients
