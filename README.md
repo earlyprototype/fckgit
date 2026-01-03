@@ -114,7 +114,7 @@ Stop. Use `--once` mode or your hackathon teammates will hate you.
 - Git (don't ask)
 - [Free Gemini API key](https://makersuite.google.com/app/apikey)
 
-Dependencies install automatically. It just works™.
+Dependencies install automatically. It just works™ (unlike you).
 
 ## License
 
