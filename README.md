@@ -26,6 +26,7 @@ The tool will:
 1. Detect changes via `git diff`
 2. Generate a Conventional Commits message using Gemini
 3. Stage and commit all changes
+4. Push to remote repository
 
 ## Requirements
 

@@ -4,7 +4,7 @@ setup(
     name="fckgit",
     version="0.1.0",
     description="Auto-commit with AI-generated messages using Gemini",
-    author="Fab2",
+    author="early_prototype",
     py_modules=["fckgit"],
     install_requires=[
         "google-generativeai>=0.3.0",

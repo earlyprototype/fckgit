@@ -62,14 +62,28 @@ Output ONLY the commit message, nothing else."""
     return response.text.strip().strip('"').strip("'")
 
 
-def commit(message: str):
+def commit(message: str) -> bool:
     """Stage all changes and commit."""
     subprocess.run(["git", "add", "-A"])
     result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True)
     if result.returncode == 0:
         print(f"✓ Committed: {message}")
+        return True
     else:
         print(f"❌ Commit failed: {result.stderr}")
+        return False
+
+
+def push():
+    """Push to remote repository."""
+    print("📤 Pushing to remote...")
+    result = subprocess.run(["git", "push"], capture_output=True, text=True)
+    if result.returncode == 0:
+        print("✓ Pushed to remote!")
+        return True
+    else:
+        print(f"❌ Push failed: {result.stderr}")
+        return False
 
 
 def main():
@@ -90,7 +104,8 @@ def main():
     message = generate_message(diff)
     
     if message:
-        commit(message)
+        if commit(message):
+            push()
     else:
         print("❌ Failed to generate commit message.")
 
