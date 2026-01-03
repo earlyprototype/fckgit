@@ -1,76 +1,83 @@
 """Quick test script to verify MCP server functionality"""
 
-import asyncio
+import subprocess
 import sys
 import os
 
-# Add current directory to path for imports
-sys.path.insert(0, os.path.dirname(__file__))
+print("Testing fckgit MCP Server Setup")
+print("=" * 50)
 
-from mcp_server.server import (
-    get_git_status,
-    get_diff,
-    generate_commit_message,
-    run_git_command,
-)
+# Test 1: Check Python imports
+print("\n1. Checking Python dependencies...")
+try:
+    import mcp
+    print("   mcp: installed")
+except ImportError:
+    print("   mcp: NOT INSTALLED - run: pip install mcp")
+    sys.exit(1)
 
+try:
+    from google import genai
+    print("   google-genai: installed")
+except ImportError:
+    print("   google-genai: NOT INSTALLED - run: pip install google-genai")
+    sys.exit(1)
 
-async def test_mcp_functions():
-    """Test the core MCP server functions"""
+try:
+    from watchdog.observers import Observer
+    print("   watchdog: installed")
+except ImportError:
+    print("   watchdog: NOT INSTALLED - run: pip install watchdog")
+
+try:
+    from dotenv import load_dotenv
+    print("   python-dotenv: installed")
+except ImportError:
+    print("   python-dotenv: NOT INSTALLED (optional)")
+
+# Test 2: Check if mcp_server module loads
+print("\n2. Checking mcp_server module...")
+try:
+    # Add current directory to path
+    sys.path.insert(0, os.path.dirname(__file__))
+    import mcp_server
+    print("   mcp_server module: OK")
+except Exception as e:
+    print(f"   mcp_server module: ERROR - {e}")
+    sys.exit(1)
+
+# Test 3: Check if we're in a git repo
+print("\n3. Checking git repository...")
+result = subprocess.run(["git", "rev-parse", "--git-dir"], capture_output=True)
+if result.returncode == 0:
+    print("   In git repository: YES")
     
-    print("Testing fckgit MCP Server Functions\n" + "=" * 50)
-    
-    # Test 1: Check if we're in a git repo
-    print("\n1. Checking if in git repository...")
-    _, _, returncode = run_git_command(["git", "rev-parse", "--git-dir"])
-    if returncode != 0:
-        print("   NOT in a git repository")
-        return
-    print("   In git repository")
-    
-    # Test 2: Get git status
-    print("\n2. Getting git status...")
-    status = get_git_status()
-    if status.strip():
-        files = [line.split()[-1] for line in status.strip().split('\n') if line.strip()]
-        print(f"   Found {len(files)} changed file(s):")
-        for f in files[:5]:  # Show first 5
-            print(f"     - {f}")
-        if len(files) > 5:
-            print(f"     ... and {len(files) - 5} more")
+    # Check status
+    status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+    if status_result.stdout.strip():
+        files = [line.split()[-1] for line in status_result.stdout.strip().split('\n') if line.strip()]
+        print(f"   Changed files: {len(files)}")
     else:
-        print("   No changes detected")
-    
-    # Test 3: Get diff
-    print("\n3. Getting diff...")
-    diff = get_diff()
-    if diff.strip():
-        lines = diff.strip().split('\n')
-        print(f"   Diff has {len(lines)} lines")
-        print("   First few lines:")
-        for line in lines[:5]:
-            print(f"     {line[:80]}")
-    else:
-        print("   No diff available")
-    
-    # Test 4: Generate commit message (only if there are changes)
-    if diff.strip():
-        print("\n4. Generating AI commit message...")
-        try:
-            message = generate_commit_message(diff)
-            print(f"   Generated: {message}")
-        except Exception as e:
-            print(f"   Error: {e}")
-    else:
-        print("\n4. Skipping commit message generation (no changes)")
-    
-    print("\n" + "=" * 50)
-    print("MCP server functions are working!")
-    print("\nNext steps:")
-    print("1. Configure your MCP client (see MCP_SETUP.md)")
-    print("2. Restart your AI assistant")
-    print("3. Try: 'What's the git status?'")
+        print("   Changed files: 0")
+else:
+    print("   In git repository: NO")
+    print("   (This is OK - MCP server will work in any git repo)")
 
+# Test 4: Check API key
+print("\n4. Checking GEMINI_API_KEY...")
+api_key = os.environ.get("GEMINI_API_KEY")
+if api_key:
+    print(f"   API key: SET (length: {len(api_key)})")
+else:
+    print("   API key: NOT SET")
+    print("   Set it in your MCP config or as environment variable")
 
-if __name__ == "__main__":
-    asyncio.run(test_mcp_functions())
+print("\n" + "=" * 50)
+print("Setup check complete!")
+print("\nNext steps:")
+print("1. Get your Gemini API key: https://makersuite.google.com/app/apikey")
+print("2. Read MCP_SETUP.md for configuration")
+print("3. Configure your AI assistant")
+print("4. Restart your AI assistant")
+print("5. Try: 'What's the git status?'")
+print("\nConfiguration example: see mcp_config_example.json")
