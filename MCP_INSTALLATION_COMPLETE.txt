@@ -61,23 +61,23 @@ WATCH MODE MANAGEMENT:
 
 MANUAL OPERATIONS:
 
-4. fckgit_status
+6. fckgit_status
    Get current git status and optionally the full diff
    
-5. fckgit_generate_message
+7. fckgit_generate_message
    Generate AI commit message without committing
    
-6. fckgit_commit
+8. fckgit_commit
    Auto-commit with AI-generated message (optional auto-push)
    
-7. fckgit_commit_with_message
+9. fckgit_commit_with_message
    Commit with a specific message (no AI)
    
-8. fckgit_push
-   Push to remote (handles conflicts with auto-rebase)
+10. fckgit_push
+    Push to remote (handles conflicts with auto-rebase)
    
-9. fckgit_cleanup_lock
-   Clean up stale git lock files
+11. fckgit_cleanup_lock
+    Clean up stale git lock files
 
 ================================================================================
                               NEXT STEPS
@@ -131,6 +131,8 @@ MANUAL OPERATIONS:
    
    Ask your AI:
    - "Blastoff!" (starts automatic watch mode)
+   - "Commit in Silicon Valley mode" (FAANG-tier professional commit)
+   - "Make this professional: 'fixed bug lol'" (professionalize a message)
    - "Is fckgit watching?" (check if running)
    - "Stop watching" (stops watch mode)
    - "What's the git status?"

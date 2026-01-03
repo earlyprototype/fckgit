@@ -193,4 +193,4 @@ Now with one command: **Blastoff.**
 
 ---
 
-MIT License. Not responsible for any commits to main while you were getting coffee.
+MIT License. Not responsible for your bad life decisions.
