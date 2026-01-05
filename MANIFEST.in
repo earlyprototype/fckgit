@@ -1,8 +1,8 @@
 include README.md
 include LICENSE
 include CHANGELOG.md
-include .env.example
-recursive-include docs *.md *.txt
+include MCP_SETUP.md
+include SILICON_VALLEY.md
 recursive-include examples *.json *.mdc
 recursive-include scripts *.ps1 *.sh *.py
 recursive-include mcp_server *.py
