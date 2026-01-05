@@ -303,7 +303,7 @@ def find_fckgit_processes() -> list[dict[str, Any]]:
     return processes
 
 
-async def start_watch_mode(cooldown: int = 30) -> tuple[bool, str, Optional[int]]:
+async def start_watch_mode(cooldown: int = 30, faang_mode: bool = False) -> tuple[bool, str, Optional[int]]:
     """Start fckgit in watch mode as a background process."""
     repo_path = await get_repo_path()
     
@@ -313,8 +313,10 @@ async def start_watch_mode(cooldown: int = 30) -> tuple[bool, str, Optional[int]
         if proc['cwd'] == repo_path:
             return False, f"fckgit watch already running (PID: {proc['pid']})", proc['pid']
     
-    # Build command with cooldown
+    # Build command with cooldown and faang mode
     cmd = [sys.executable, "-m", "fckgit", "--cooldown", str(cooldown)]
+    if faang_mode:
+        cmd.append("--faang")
     
     # Start the process
     try:
