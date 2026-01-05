@@ -245,9 +245,9 @@ async def commit_changes(message: str, stage_all: bool = True) -> tuple[bool, st
         return False, f"Commit failed: {error_msg}"
 
 
-def push_to_remote() -> tuple[bool, str]:
+async def push_to_remote() -> tuple[bool, str]:
     """Push to remote repository."""
-    stdout, stderr, returncode = run_git_command(["git", "push"])
+    stdout, stderr, returncode = await run_git_command(["git", "push"])
     
     if returncode == 0:
         return True, "Successfully pushed to remote"
@@ -257,11 +257,11 @@ def push_to_remote() -> tuple[bool, str]:
     # Try to handle rejected push
     if "rejected" in error_msg.lower() or "fetch first" in error_msg.lower():
         # Try to pull with rebase
-        _, _, pull_returncode = run_git_command(["git", "pull", "--rebase"])
+        _, _, pull_returncode = await run_git_command(["git", "pull", "--rebase"])
         
         if pull_returncode == 0:
             # Try pushing again
-            _, _, retry_returncode = run_git_command(["git", "push"])
+            _, _, retry_returncode = await run_git_command(["git", "push"])
             if retry_returncode == 0:
                 return True, "Pulled, rebased, and pushed successfully"
             return False, "Failed to push after rebase"
