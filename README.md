@@ -106,7 +106,7 @@ See [MCP_SETUP.md](MCP_SETUP.md) for complete setup instructions for:
 **Available Tools:**
 
 Your AI assistant can now:
-- **BLASTOFF** - Launch full auto mode with custom cooldown (`fckgit_blastoff`)
+- **BLASTOFF** - Launch full auto mode with custom cooldown and optional FAANG mode (`fckgit_blastoff`)
 - **SILICON VALLEY** - Make commits sound FAANG professional (`fckgit_silicon_valley`)
 - **PROFESSIONALIZE** - Transform casual messages to enterprise-grade (`fckgit_professionalize`)
 - Check watch status (`fckgit_watch_status`)
@@ -118,7 +118,7 @@ Your AI assistant can now:
 - Push to remote (`fckgit_push`)
 - Clean up lock files (`fckgit_cleanup_lock`)
 
-Tell your AI "blastoff" for auto mode, or "Silicon Valley mode" to sound like a Staff Engineer. What could possibly go wrong?
+Tell your AI "blastoff" for auto mode, "blastoff in Silicon Valley mode" for professional commits, or just "Silicon Valley mode" for a single FAANG-tier commit. What could possibly go wrong?
 
 ## Setup (Takes 30 Seconds)
 

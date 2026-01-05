@@ -5,18 +5,22 @@
 ### Added
 - **`--cooldown` flag** - Configurable cooldown parameter for watch mode (default: 30 seconds)
 - `cooldown` parameter for `fckgit_blastoff` MCP tool
+- **`faang_mode` parameter for `fckgit_blastoff`** - Enable Silicon Valley mode in watch mode via MCP
 - Cooldown time display in watch mode startup banner
+- FAANG mode indicator in blastoff response message
 
 ### Changed
 - `watch_mode()` now accepts `cooldown` parameter
 - `GitChangeHandler` now accepts `cooldown` in constructor
-- `start_watch_mode()` in MCP server now accepts and passes cooldown to fckgit process
-- MCP blastoff tool now shows actual cooldown value in response message
+- `start_watch_mode()` in MCP server now accepts `cooldown` and `faang_mode` parameters
+- MCP blastoff tool now shows actual cooldown value and mode in response message
 
 ### Features
 - Users can customize auto-commit frequency via `--cooldown` flag
 - MCP users can specify cooldown when launching blastoff mode
+- **MCP users can now enable Silicon Valley mode in watch mode** via `fckgit_blastoff(faang_mode=True)`
 - More flexibility for different workflow needs (rapid commits vs. batched changes)
+- Professional commit messages now available in automatic watch mode
 
 ## [0.2.0] - 2026-01-03
 

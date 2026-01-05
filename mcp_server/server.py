@@ -508,6 +508,11 @@ async def handle_list_tools() -> list[types.Tool]:
                         "type": "number",
                         "description": "Cooldown time in seconds between commits (default: 30)",
                         "default": 30
+                    },
+                    "faang_mode": {
+                        "type": "boolean",
+                        "description": "Enable Silicon Valley mode for FAANG-tier professional commit messages (default: false)",
+                        "default": False
                     }
                 }
             }
@@ -708,11 +713,15 @@ async def handle_call_tool(
     
     elif name == "fckgit_blastoff":
         cooldown = arguments.get("cooldown", 30)
-        success, message, pid = await start_watch_mode(cooldown=cooldown)
+        faang_mode = arguments.get("faang_mode", False)
+        success, message, pid = await start_watch_mode(cooldown=cooldown, faang_mode=faang_mode)
         if success:
             result = f"BLASTOFF! {message}\n\n"
             result += "fckgit is now watching for changes and will:\n"
-            result += "- Auto-commit every change with AI-generated messages\n"
+            if faang_mode:
+                result += "- Auto-commit with FAANG-tier professional AI messages (SILICON VALLEY MODE)\n"
+            else:
+                result += "- Auto-commit every change with AI-generated messages\n"
             result += "- Auto-push to remote\n"
             result += f"- {cooldown} second cooldown between commits\n\n"
             result += "Use fckgit_stop_watch to stop it."

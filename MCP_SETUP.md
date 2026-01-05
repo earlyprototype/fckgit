@@ -69,7 +69,9 @@ Add to your Cursor MCP settings:
 Tell your AI assistant:
 
 **"Blastoff!"** - Start automatic watch mode (auto-commits everything)
-- `fckgit_blastoff` - Launch watch mode (optional: `cooldown` parameter in seconds, default: 30)
+- `fckgit_blastoff` - Launch watch mode
+  - `cooldown` (optional): Time in seconds between commits (default: 30)
+  - `faang_mode` (optional): Enable Silicon Valley professional commits (default: false)
 - `fckgit_watch_status` - Check if running
 - `fckgit_stop_watch` - Stop watch mode
 
@@ -122,6 +124,10 @@ AI: BLASTOFF! fckgit watch mode started (PID: 12345)
 You: "Blastoff with 5 minute cooldown"
 AI: BLASTOFF! fckgit watch mode started (PID: 12345)
     300 second cooldown between commits
+
+You: "Blastoff in Silicon Valley mode"
+AI: BLASTOFF! fckgit watch mode started (PID: 12345)
+    SILICON VALLEY MODE - FAANG-tier professional commits enabled
 
 You: "Commit in Silicon Valley mode"
 AI: Committed [abc1234]: refactor: Optimize system architecture
