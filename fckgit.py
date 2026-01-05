@@ -199,9 +199,9 @@ def push():
 class GitChangeHandler(FileSystemEventHandler):
     """Handle file system events and trigger commits."""
     
-    def __init__(self, faang_mode: bool = False):
+    def __init__(self, faang_mode: bool = False, cooldown: int = 30):
         self.last_commit_time = 0
-        self.cooldown = 30  # seconds between commits
+        self.cooldown = cooldown  # seconds between commits
         self.faang_mode = faang_mode
         
     def should_process(self, event):
@@ -286,7 +286,7 @@ class GitChangeHandler(FileSystemEventHandler):
         print("="*50 + "\n")
 
 
-def watch_mode(faang_mode: bool = False):
+def watch_mode(faang_mode: bool = False, cooldown: int = 30):
     """Start watching for file changes."""
     if not WATCHDOG_AVAILABLE:
         print("❌ watchdog not installed. Run: pip install watchdog")
@@ -311,6 +311,7 @@ def watch_mode(faang_mode: bool = False):
     print(f"   Branch: {branch}")
     if faang_mode:
         print("   Mode: FAANG Professional")
+    print(f"   Cooldown: {cooldown} seconds")
     print(f"   Started: {start_time}")
     print(f"   Press Ctrl+C to stop")
     print("="*50)
@@ -368,6 +369,12 @@ def main():
         action="store_true",
         help="Silicon Valley mode - Generate FAANG-tier professional commit messages"
     )
+    parser.add_argument(
+        "--cooldown",
+        type=int,
+        default=30,
+        help="Cooldown time in seconds between commits (default: 30)"
+    )
     args = parser.parse_args()
     
     # Check if we're in a git repo
@@ -400,7 +407,7 @@ def main():
         return
     
     # Default: Watch mode
-    watch_mode(faang_mode=args.faang)
+    watch_mode(faang_mode=args.faang, cooldown=args.cooldown)
 
 
 if __name__ == "__main__":

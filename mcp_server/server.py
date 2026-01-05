@@ -303,7 +303,7 @@ def find_fckgit_processes() -> list[dict[str, Any]]:
     return processes
 
 
-async def start_watch_mode() -> tuple[bool, str, Optional[int]]:
+async def start_watch_mode(cooldown: int = 30) -> tuple[bool, str, Optional[int]]:
     """Start fckgit in watch mode as a background process."""
     repo_path = await get_repo_path()
     
@@ -313,13 +313,16 @@ async def start_watch_mode() -> tuple[bool, str, Optional[int]]:
         if proc['cwd'] == repo_path:
             return False, f"fckgit watch already running (PID: {proc['pid']})", proc['pid']
     
+    # Build command with cooldown
+    cmd = [sys.executable, "-m", "fckgit", "--cooldown", str(cooldown)]
+    
     # Start the process
     try:
         # Use CREATE_NEW_PROCESS_GROUP on Windows or start_new_session on Unix
         if sys.platform == 'win32':
             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
             process = subprocess.Popen(
-                [sys.executable, "-m", "fckgit"],
+                cmd,
                 cwd=repo_path,
                 creationflags=creationflags,
                 stdout=subprocess.DEVNULL,
@@ -328,7 +331,7 @@ async def start_watch_mode() -> tuple[bool, str, Optional[int]]:
             )
         else:
             process = subprocess.Popen(
-                [sys.executable, "-m", "fckgit"],
+                cmd,
                 cwd=repo_path,
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
@@ -498,7 +501,13 @@ async def handle_list_tools() -> list[types.Tool]:
             description="START AUTOMATIC WATCH MODE - Launch fckgit in full auto mode (watches files, auto-commits, auto-pushes). Maximum automation. This runs in the background until stopped.",
             inputSchema={
                 "type": "object",
-                "properties": {}
+                "properties": {
+                    "cooldown": {
+                        "type": "number",
+                        "description": "Cooldown time in seconds between commits (default: 30)",
+                        "default": 30
+                    }
+                }
             }
         ),
         types.Tool(
@@ -696,13 +705,14 @@ async def handle_call_tool(
         return [types.TextContent(type="text", text="No stale git lock file found")]
     
     elif name == "fckgit_blastoff":
-        success, message, pid = await start_watch_mode()
+        cooldown = arguments.get("cooldown", 30)
+        success, message, pid = await start_watch_mode(cooldown=cooldown)
         if success:
             result = f"BLASTOFF! {message}\n\n"
             result += "fckgit is now watching for changes and will:\n"
             result += "- Auto-commit every change with AI-generated messages\n"
             result += "- Auto-push to remote\n"
-            result += "- 30 second cooldown between commits\n\n"
+            result += f"- {cooldown} second cooldown between commits\n\n"
             result += "Use fckgit_stop_watch to stop it."
         else:
             result = message
