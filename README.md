@@ -151,6 +151,12 @@ python -m fckgit
 
 # Silicon Valley mode (FAANG-tier professional commits):
 python -m fckgit --faang
+
+# Custom cooldown (default is 30 seconds):
+python -m fckgit --cooldown 60
+
+# Combine options:
+python -m fckgit --faang --cooldown 120
 ```
 
 It literally just works:
@@ -158,7 +164,7 @@ It literally just works:
 - You code, it commits
 - AI writes the message
 - Auto-pushes to GitHub
-- 30 second cooldown
+- Configurable cooldown (default: 30s)
 - `Ctrl+C` when you're done being productive
 
 **What you'll see:**
