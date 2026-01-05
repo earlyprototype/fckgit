@@ -38,34 +38,78 @@ server = Server("fckgit")
 # Track running watch processes
 _watch_processes: dict[str, subprocess.Popen] = {}
 
+# Store the working directory - should be the fckgit repo root
+REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-def run_git_command(cmd: list[str]) -> tuple[str, str, int]:
+
+async def run_git_command(cmd: list[str]) -> tuple[str, str, int]:
     """Run a git command and return stdout, stderr, returncode."""
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        encoding='utf-8',
-        errors='replace'
-    )
-    return result.stdout, result.stderr, result.returncode
+    try:
+        # On Windows, use shell=True for better process handling
+        import platform
+        is_windows = platform.system() == 'Windows'
+        
+        # Build subprocess kwargs
+        kwargs = {
+            'stdout': subprocess.PIPE,
+            'stderr': subprocess.PIPE,
+            'stdin': subprocess.DEVNULL,  # Close stdin to prevent hanging
+            'cwd': REPO_DIR,
+            'timeout': 15.0,
+            'text': True,
+            'shell': is_windows
+        }
+        
+        # Add Windows-specific flags
+        if is_windows:
+            kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
+        
+        loop = asyncio.get_event_loop()
+        
+        # On Windows with shell=True, we need to properly quote arguments
+        if is_windows:
+            # Quote each argument that contains spaces or special characters
+            quoted_cmd = []
+            for arg in cmd:
+                if ' ' in arg or '"' in arg:
+                    # Escape quotes and wrap in quotes
+                    arg = arg.replace('"', '\\"')
+                    quoted_cmd.append(f'"{arg}"')
+                else:
+                    quoted_cmd.append(arg)
+            cmd_str = ' '.join(quoted_cmd)
+        else:
+            cmd_str = cmd
+        
+        result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                cmd_str if is_windows else cmd,
+                **kwargs
+            )
+        )
+        return result.stdout, result.stderr, result.returncode
+    except subprocess.TimeoutExpired:
+        return "", "Command timed out", 1
+    except Exception as e:
+        return "", str(e), 1
 
 
-def get_diff() -> str:
+async def get_diff() -> str:
     """Get unstaged changes."""
-    stdout, _, returncode = run_git_command(["git", "diff"])
+    stdout, _, returncode = await run_git_command(["git", "diff"])
     return stdout if returncode == 0 else ""
 
 
-def get_staged_diff() -> str:
+async def get_staged_diff() -> str:
     """Get staged changes."""
-    stdout, _, returncode = run_git_command(["git", "diff", "--cached"])
+    stdout, _, returncode = await run_git_command(["git", "diff", "--cached"])
     return stdout if returncode == 0 else ""
 
 
-def get_git_status() -> str:
+async def get_git_status() -> str:
     """Get git status."""
-    stdout, _, returncode = run_git_command(["git", "status", "--porcelain"])
+    stdout, _, returncode = await run_git_command(["git", "status", "--porcelain"])
     return stdout if returncode == 0 else ""
 
 
@@ -178,20 +222,20 @@ def cleanup_git_lock():
     return False
 
 
-def commit_changes(message: str, stage_all: bool = True) -> tuple[bool, str]:
+async def commit_changes(message: str, stage_all: bool = True) -> tuple[bool, str]:
     """Stage all changes and commit."""
     cleanup_git_lock()
     
     if stage_all:
-        _, _, returncode = run_git_command(["git", "add", "-A"])
+        _, _, returncode = await run_git_command(["git", "add", "-A"])
         if returncode != 0:
             return False, "Failed to stage files"
     
-    stdout, stderr, returncode = run_git_command(["git", "commit", "-m", message])
+    stdout, stderr, returncode = await run_git_command(["git", "commit", "-m", message])
     
     if returncode == 0:
         # Get the commit hash
-        hash_stdout, _, hash_returncode = run_git_command(["git", "rev-parse", "--short", "HEAD"])
+        hash_stdout, _, hash_returncode = await run_git_command(["git", "rev-parse", "--short", "HEAD"])
         commit_hash = hash_stdout.strip() if hash_returncode == 0 else "unknown"
         return True, f"Committed successfully [{commit_hash}]: {message}"
     else:
@@ -226,9 +270,9 @@ def push_to_remote() -> tuple[bool, str]:
     return False, f"Push failed: {error_msg}"
 
 
-def get_repo_path() -> str:
+async def get_repo_path() -> str:
     """Get the current repository root path."""
-    stdout, _, returncode = run_git_command(["git", "rev-parse", "--show-toplevel"])
+    stdout, _, returncode = await run_git_command(["git", "rev-parse", "--show-toplevel"])
     if returncode == 0:
         return stdout.strip()
     return os.getcwd()
@@ -259,9 +303,9 @@ def find_fckgit_processes() -> list[dict[str, Any]]:
     return processes
 
 
-def start_watch_mode() -> tuple[bool, str, Optional[int]]:
+async def start_watch_mode() -> tuple[bool, str, Optional[int]]:
     """Start fckgit in watch mode as a background process."""
-    repo_path = get_repo_path()
+    repo_path = await get_repo_path()
     
     # Check if already running in this repo
     existing = find_fckgit_processes()
@@ -300,9 +344,9 @@ def start_watch_mode() -> tuple[bool, str, Optional[int]]:
         return False, f"Failed to start watch mode: {str(e)}", None
 
 
-def stop_watch_mode(pid: Optional[int] = None) -> tuple[bool, str]:
+async def stop_watch_mode(pid: Optional[int] = None) -> tuple[bool, str]:
     """Stop a running fckgit watch process."""
-    repo_path = get_repo_path()
+    repo_path = await get_repo_path()
     
     # If PID provided, try to kill that specific process
     if pid:
@@ -337,9 +381,9 @@ def stop_watch_mode(pid: Optional[int] = None) -> tuple[bool, str]:
     return False, "No fckgit watch process found for this repository"
 
 
-def get_watch_status() -> tuple[bool, str]:
+async def get_watch_status() -> tuple[bool, str]:
     """Check if fckgit watch is running in current repo."""
-    repo_path = get_repo_path()
+    repo_path = await get_repo_path()
     existing = find_fckgit_processes()
     
     for proc in existing:
@@ -353,6 +397,15 @@ def get_watch_status() -> tuple[bool, str]:
 async def handle_list_tools() -> list[types.Tool]:
     """List available tools."""
     return [
+        types.Tool(
+            name="fckgit_debug",
+            description="Debug MCP server configuration and git repo detection",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
         types.Tool(
             name="fckgit_status",
             description="Get the current git status and diff of the repository",
@@ -514,8 +567,30 @@ async def handle_call_tool(
     if arguments is None:
         arguments = {}
     
-    # Check if in git repo
-    _, _, returncode = run_git_command(["git", "rev-parse", "--git-dir"])
+    # Debug tool doesn't require git repo
+    if name == "fckgit_debug":
+        import os.path
+        debug_info = {
+            "REPO_DIR": REPO_DIR,
+            "REPO_DIR_exists": os.path.exists(REPO_DIR),
+            "is_directory": os.path.isdir(REPO_DIR),
+            "cwd": os.getcwd(),
+            "__file__": __file__,
+        }
+        # Check if .git exists
+        git_dir = os.path.join(REPO_DIR, ".git")
+        debug_info[".git_exists"] = os.path.exists(git_dir)
+        
+        # Try running git status
+        stdout, stderr, returncode = await run_git_command(["git", "status", "--porcelain"])
+        debug_info["git_status_returncode"] = returncode
+        debug_info["git_status_stdout"] = stdout[:200] if stdout else ""
+        debug_info["git_status_stderr"] = stderr[:200] if stderr else ""
+        
+        return [types.TextContent(type="text", text=str(debug_info))]
+    
+    # Check if in git repo (skip for debug tool)
+    _, _, returncode = await run_git_command(["git", "rev-parse", "--git-dir"])
     if returncode != 0:
         return [types.TextContent(
             type="text",
@@ -525,7 +600,7 @@ async def handle_call_tool(
     if name == "fckgit_status":
         include_diff = arguments.get("include_diff", False)
         
-        status = get_git_status()
+        status = await get_git_status()
         if not status.strip():
             result = "No changes detected"
         else:
@@ -533,7 +608,9 @@ async def handle_call_tool(
             result = f"Changed files ({len(files)}):\n" + "\n".join(f"  - {f}" for f in files)
             
             if include_diff:
-                diff = get_staged_diff() or get_diff()
+                staged = await get_staged_diff()
+                unstaged = await get_diff()
+                diff = staged or unstaged
                 if diff:
                     result += f"\n\nDiff:\n{diff}"
         
@@ -543,9 +620,11 @@ async def handle_call_tool(
         use_staged = arguments.get("use_staged", False)
         
         if use_staged:
-            diff = get_staged_diff()
+            diff = await get_staged_diff()
         else:
-            diff = get_staged_diff() or get_diff()
+            staged = await get_staged_diff()
+            unstaged = await get_diff()
+            diff = staged or unstaged
         
         if not diff.strip():
             return [types.TextContent(type="text", text="No changes to generate message for")]
@@ -560,9 +639,11 @@ async def handle_call_tool(
         # Get diff for message generation
         if stage_all:
             # Stage first so we can see untracked files
-            run_git_command(["git", "add", "-A"])
+            await run_git_command(["git", "add", "-A"])
         
-        diff = get_staged_diff() or get_diff()
+        staged = await get_staged_diff()
+        unstaged = await get_diff()
+        diff = staged or unstaged
         
         if not diff.strip():
             return [types.TextContent(type="text", text="No changes to commit")]
@@ -571,14 +652,14 @@ async def handle_call_tool(
         message = generate_commit_message(diff)
         
         # Commit
-        success, result_msg = commit_changes(message, stage_all=False)  # Already staged
+        success, result_msg = await commit_changes(message, stage_all=False)  # Already staged
         
         if not success:
             return [types.TextContent(type="text", text=result_msg)]
         
         # Push if requested
         if push:
-            push_success, push_msg = push_to_remote()
+            push_success, push_msg = await push_to_remote()
             result_msg += f"\n{push_msg}"
         
         return [types.TextContent(type="text", text=result_msg)]
@@ -592,20 +673,20 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text="Error: message is required")]
         
         # Commit
-        success, result_msg = commit_changes(message, stage_all=stage_all)
+        success, result_msg = await commit_changes(message, stage_all=stage_all)
         
         if not success:
             return [types.TextContent(type="text", text=result_msg)]
         
         # Push if requested
         if push:
-            push_success, push_msg = push_to_remote()
+            push_success, push_msg = await push_to_remote()
             result_msg += f"\n{push_msg}"
         
         return [types.TextContent(type="text", text=result_msg)]
     
     elif name == "fckgit_push":
-        success, message = push_to_remote()
+        success, message = await push_to_remote()
         return [types.TextContent(type="text", text=message)]
     
     elif name == "fckgit_cleanup_lock":
@@ -615,7 +696,7 @@ async def handle_call_tool(
         return [types.TextContent(type="text", text="No stale git lock file found")]
     
     elif name == "fckgit_blastoff":
-        success, message, pid = start_watch_mode()
+        success, message, pid = await start_watch_mode()
         if success:
             result = f"BLASTOFF! {message}\n\n"
             result += "fckgit is now watching for changes and will:\n"
@@ -629,11 +710,11 @@ async def handle_call_tool(
     
     elif name == "fckgit_stop_watch":
         pid = arguments.get("pid")
-        success, message = stop_watch_mode(pid=pid)
+        success, message = await stop_watch_mode(pid=pid)
         return [types.TextContent(type="text", text=message)]
     
     elif name == "fckgit_watch_status":
-        is_running, message = get_watch_status()
+        is_running, message = await get_watch_status()
         return [types.TextContent(type="text", text=message)]
     
     elif name == "fckgit_silicon_valley":
@@ -643,9 +724,11 @@ async def handle_call_tool(
         # Get diff for message generation
         if stage_all:
             # Stage first so we can see untracked files
-            run_git_command(["git", "add", "-A"])
+            await run_git_command(["git", "add", "-A"])
         
-        diff = get_staged_diff() or get_diff()
+        staged = await get_staged_diff()
+        unstaged = await get_diff()
+        diff = staged or unstaged
         
         if not diff.strip():
             return [types.TextContent(type="text", text="No changes to commit")]
@@ -654,7 +737,7 @@ async def handle_call_tool(
         message = generate_silicon_valley_message(diff)
         
         # Commit
-        success, result_msg = commit_changes(message, stage_all=False)  # Already staged
+        success, result_msg = await commit_changes(message, stage_all=False)  # Already staged
         
         if not success:
             return [types.TextContent(type="text", text=result_msg)]
@@ -663,7 +746,7 @@ async def handle_call_tool(
         
         # Push if requested
         if push:
-            push_success, push_msg = push_to_remote()
+            push_success, push_msg = await push_to_remote()
             result += f"\n{push_msg}"
         
         return [types.TextContent(type="text", text=result)]
