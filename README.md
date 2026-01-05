@@ -106,7 +106,7 @@ See [MCP_SETUP.md](MCP_SETUP.md) for complete setup instructions for:
 **Available Tools:**
 
 Your AI assistant can now:
-- **BLASTOFF** - Launch full auto mode (`fckgit_blastoff`)
+- **BLASTOFF** - Launch full auto mode with custom cooldown (`fckgit_blastoff`)
 - **SILICON VALLEY** - Make commits sound FAANG professional (`fckgit_silicon_valley`)
 - **PROFESSIONALIZE** - Transform casual messages to enterprise-grade (`fckgit_professionalize`)
 - Check watch status (`fckgit_watch_status`)

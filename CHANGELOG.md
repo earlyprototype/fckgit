@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.1] - 2026-01-03
+
+### Added
+- **`--cooldown` flag** - Configurable cooldown parameter for watch mode (default: 30 seconds)
+- `cooldown` parameter for `fckgit_blastoff` MCP tool
+- Cooldown time display in watch mode startup banner
+
+### Changed
+- `watch_mode()` now accepts `cooldown` parameter
+- `GitChangeHandler` now accepts `cooldown` in constructor
+- `start_watch_mode()` in MCP server now accepts and passes cooldown to fckgit process
+- MCP blastoff tool now shows actual cooldown value in response message
+
+### Features
+- Users can customize auto-commit frequency via `--cooldown` flag
+- MCP users can specify cooldown when launching blastoff mode
+- More flexibility for different workflow needs (rapid commits vs. batched changes)
+
 ## [0.2.0] - 2026-01-03
 
 ### Added
