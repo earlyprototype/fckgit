@@ -88,11 +88,12 @@ fckgit now includes an MCP (Model Context Protocol) server so AI assistants can 
 **Quick Setup:**
 
 ```bash
-# Install MCP support
-pip install mcp>=1.0.0
+# Install fckgit with MCP support
+pip install -e ".[mcp]"
 
-# Test it works
-python test_mcp.py
+# Or use the install script
+.\scripts\install_mcp.ps1    # Windows
+./scripts/install_mcp.sh     # Mac/Linux/iPad
 ```
 
 **Configuration:**

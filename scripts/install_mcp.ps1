@@ -17,22 +17,28 @@ try {
     exit 1
 }
 
-# Install MCP
+# Install fckgit with MCP support
 Write-Host ""
-Write-Host "Installing MCP Python SDK and dependencies..." -ForegroundColor Yellow
-pip install "mcp>=1.0.0" "psutil>=5.9.0"
+Write-Host "Installing fckgit package with MCP support..." -ForegroundColor Yellow
+python -m pip install -e ".[mcp]"
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to install MCP dependencies" -ForegroundColor Red
-    exit 1
+    Write-Host "Failed to install fckgit with MCP support" -ForegroundColor Red
+    Write-Host "Trying alternative installation method..." -ForegroundColor Yellow
+    python -m pip install -e .
+    python -m pip install "mcp>=1.0.0" "psutil>=5.9.0"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Installation failed" -ForegroundColor Red
+        exit 1
+    }
 }
 
-Write-Host "MCP dependencies installed successfully!" -ForegroundColor Green
+Write-Host "fckgit MCP server installed successfully!" -ForegroundColor Green
 
 # Test the setup
 Write-Host ""
 Write-Host "Testing MCP server setup..." -ForegroundColor Yellow
-python test_mcp.py
+python scripts\test_mcp.py
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

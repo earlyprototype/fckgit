@@ -18,22 +18,28 @@ fi
 PYTHON_VERSION=$(python3 --version)
 echo "Found: $PYTHON_VERSION"
 
-# Install MCP
+# Install fckgit with MCP support
 echo ""
-echo "Installing MCP Python SDK and dependencies..."
-pip3 install "mcp>=1.0.0" "psutil>=5.9.0"
+echo "Installing fckgit package with MCP support..."
+python3 -m pip install -e ".[mcp]"
 
 if [ $? -ne 0 ]; then
-    echo "Failed to install MCP dependencies"
-    exit 1
+    echo "Failed to install fckgit with MCP support"
+    echo "Trying alternative installation method..."
+    python3 -m pip install -e .
+    python3 -m pip install "mcp>=1.0.0" "psutil>=5.9.0"
+    if [ $? -ne 0 ]; then
+        echo "Installation failed"
+        exit 1
+    fi
 fi
 
-echo "MCP dependencies installed successfully!"
+echo "fckgit MCP server installed successfully!"
 
 # Test the setup
 echo ""
 echo "Testing MCP server setup..."
-python3 test_mcp.py
+python3 scripts/test_mcp.py
 
 if [ $? -ne 0 ]; then
     echo ""

@@ -4,14 +4,24 @@ Let AI assistants (Cursor, Claude Desktop) auto-commit your code.
 
 ## Installation
 
-```bash
-# Install MCP dependencies
-pip install "mcp>=1.0.0" "psutil>=5.9.0"
+**Option 1: One Command (Recommended)**
 
-# Or use the install script
+```bash
+# Install fckgit with MCP support
+pip install -e ".[mcp]"
+```
+
+**Option 2: Use Install Script**
+
+```bash
 .\scripts\install_mcp.ps1    # Windows
 ./scripts/install_mcp.sh     # Mac/Linux/iPad
 ```
+
+**What This Does:**
+- Installs fckgit as a package (makes `mcp_server` module available)
+- Installs MCP dependencies (`mcp>=1.0.0`, `psutil>=5.9.0`)
+- Sets up everything needed for the MCP server to run
 
 ## Configuration
 
@@ -89,6 +99,10 @@ Tell your AI assistant:
 **"Not a git repository"**
 - MCP server only works in git repositories
 - Navigate to a git repo first
+
+**"No module named 'mcp_server'"**
+- Run: `pip install -e ".[mcp]"` from the fckgit directory
+- This installs fckgit as a package so Python can find mcp_server
 
 **"mcp not installed"**
 - Run: `pip install mcp psutil`
