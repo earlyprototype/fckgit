@@ -340,7 +340,7 @@ def watch_mode(faang_mode: bool = False, cooldown: int = 30):
                 print(f"❌ Error committing existing changes: {e}")
                 print()
     
-    event_handler = GitChangeHandler(faang_mode=faang_mode)
+    event_handler = GitChangeHandler(faang_mode=faang_mode, cooldown=cooldown)
     observer = Observer()
     observer.schedule(event_handler, ".", recursive=True)
     observer.start()
