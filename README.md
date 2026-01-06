@@ -81,27 +81,67 @@ pip install .
 
 That's it. No docker containers, no kubernetes, no viruses. 
 
-## MCP Server
+## MCP Server - Let AI Auto-Commit Your Code
 
-fckgit now includes an MCP (Model Context Protocol) server so AI assistants can auto-commit your code directly.
+fckgit includes an MCP server. Your AI assistant commits directly. No manual git anymore.
 
-**Quick Setup:**
+### Step 1: Install
 
 ```bash
-# Install fckgit with MCP support
 pip install -e ".[mcp]"
-
-# Or use the install script
-.\scripts\install_mcp.ps1    # Windows
-./scripts/install_mcp.sh     # Mac/Linux/iPad
 ```
 
-**Configuration:**
+### Step 2: Configure (Pick Your IDE)
 
-See [MCP_SETUP.md](MCP_SETUP.md) for complete setup instructions for:
-- Cursor IDE
-- Claude Desktop
-- Other MCP clients
+**If you use Cursor or VSCode:**
+
+Add this to your MCP config. That's it. Auto-detects your project.
+
+```json
+{
+  "mcpServers": {
+    "fckgit": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "env": {
+        "GEMINI_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**If you use Claude Desktop or other IDEs:**
+
+Add this to your MCP config. Replace `/path/to/your/project` with your actual project path.
+
+```json
+{
+  "mcpServers": {
+    "fckgit": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/your/project",
+      "env": {
+        "GEMINI_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+### Step 3: Restart Your IDE
+
+Reload Cursor or restart Claude Desktop.
+
+### Step 4: Use It
+
+Tell your AI:
+- **"blastoff"** - Auto-commits everything forever
+- **"silicon valley mode"** - One FAANG-tier professional commit
+- **"commit these changes"** - Normal AI commit
+
+Full docs: [MCP_SETUP.md](MCP_SETUP.md)
 
 **Available Tools:**
 

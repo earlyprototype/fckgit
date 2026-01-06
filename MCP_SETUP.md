@@ -1,35 +1,35 @@
 # fckgit MCP Server Setup
 
-Let AI assistants (Cursor, Claude Desktop) auto-commit your code.
+Let AI assistants auto-commit your code.
 
-## Installation
+## Quick Start: 3 Steps
 
-**Option 1: One Command (Recommended)**
+### 1. Install
 
 ```bash
-# Install fckgit with MCP support
 pip install -e ".[mcp]"
 ```
 
-**Option 2: Use Install Script**
+### 2. Get Your API Key
 
-```bash
-.\scripts\install_mcp.ps1    # Windows
-./scripts/install_mcp.sh     # Mac/Linux/iPad
-```
+Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
-**What This Does:**
-- Installs fckgit as a package (makes `mcp_server` module available)
-- Installs MCP dependencies (`mcp>=1.0.0`, `psutil>=5.9.0`)
-- Sets up everything needed for the MCP server to run
+### 3. Configure (Choose Your IDE)
 
-## Configuration
+**Using Cursor or VSCode?** → Skip to [Cursor/VSCode Setup](#cursor-ide-automatic-detection)  
+**Using Claude Desktop?** → Skip to [Claude Desktop Setup](#claude-desktop)  
+**Using something else?** → Skip to [Other IDEs Setup](#other-ides--mcp-clients)
+
+---
+
+## Configuration by IDE
 
 ### Cursor IDE (Automatic Detection)
 
-The MCP server **automatically detects your Cursor workspace** - just add your API key and go!
+**Zero configuration. Just add your API key.**
 
-Add to your Cursor MCP settings (File > Preferences > Cursor Settings > MCP):
+1. Open Cursor Settings: `File > Preferences > Cursor Settings > MCP`
+2. Add this config:
 
 ```json
 {
@@ -38,19 +38,51 @@ Add to your Cursor MCP settings (File > Preferences > Cursor Settings > MCP):
       "command": "python",
       "args": ["-m", "mcp_server"],
       "env": {
-        "GEMINI_API_KEY": "your_gemini_api_key_here"
+        "GEMINI_API_KEY": "paste_your_api_key_here"
       }
     }
   }
 }
 ```
 
-**That's it!** Switch between Cursor projects and fckgit automatically follows. No `cwd` or `PROJECT_ROOT` configuration needed.
+3. Reload Cursor: `Ctrl+Shift+P` → "Developer: Reload Window"
+
+**Done.** Switch projects in Cursor, fckgit follows automatically.
+
+### VSCode (with MCP Extension)
+
+**Same as Cursor - zero configuration.**
+
+1. Install an MCP extension for VSCode (if available)
+2. Add this to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "fckgit": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "env": {
+        "GEMINI_API_KEY": "paste_your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+3. Reload VSCode
+
+**Done.** Auto-detects your workspace like Cursor.
 
 ### Claude Desktop
 
-**Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+**You need to set your project path manually.**
+
+1. Find your Claude config file:
+   - **Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. Add this config (replace `/path/to/your/project` with your actual project path):
 
 ```json
 {
@@ -60,14 +92,72 @@ Add to your Cursor MCP settings (File > Preferences > Cursor Settings > MCP):
       "args": ["-m", "mcp_server"],
       "cwd": "/path/to/your/project",
       "env": {
-        "GEMINI_API_KEY": "your_api_key_here"
+        "GEMINI_API_KEY": "paste_your_api_key_here"
       }
     }
   }
 }
 ```
 
-**Note:** Claude Desktop may not auto-detect workspaces like Cursor does, so setting `cwd` is recommended.
+3. Restart Claude Desktop
+
+**Important:** Change the `cwd` path to your actual git repository path. Example:
+- Windows: `"cwd": "C:\\Users\\YourName\\Projects\\my-app"`
+- Mac/Linux: `"cwd": "/Users/yourname/projects/my-app"`
+
+### Other IDEs / MCP Clients
+
+**For JetBrains (IntelliJ, PyCharm, WebStorm), Neovim, Zed, Emacs, etc.**
+
+Same as Claude Desktop - set your project path manually:
+
+```json
+{
+  "mcpServers": {
+    "fckgit": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/your/project",
+      "env": {
+        "GEMINI_API_KEY": "paste_your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Replace `/path/to/your/project` with your actual project path.**
+
+The server finds your git root automatically from that path, so it works in monorepos and subdirectories.
+
+---
+
+## How to Use fckgit
+
+After setup, tell your AI assistant these commands:
+
+### Basic Commands
+
+| What You Say | What Happens |
+|--------------|-------------|
+| **"blastoff"** | Starts auto-commit mode. Commits everything forever. |
+| **"stop watching"** | Stops auto-commit mode. |
+| **"commit these changes"** | One AI commit right now. |
+| **"silicon valley mode"** | One FAANG-tier professional commit. |
+| **"what's the git status?"** | Shows changed files. |
+| **"push to remote"** | Pushes commits to GitHub/GitLab. |
+
+### Advanced Commands
+
+| What You Say | What Happens |
+|--------------|-------------|
+| **"blastoff with 5 minute cooldown"** | Auto-commits every 5 minutes instead of 30 seconds. |
+| **"blastoff in silicon valley mode"** | Auto-commits with FAANG-tier professional messages. |
+| **"is fckgit running?"** | Checks if watch mode is active. |
+
+**That's it.** Your AI handles git for you now.
+
+---
 
 ## Available Tools
 
@@ -99,52 +189,54 @@ Tell your AI assistant:
 
 ## Troubleshooting
 
-**"Not a git repository"**
-- Make sure you're working in a git repository
-- Run `git init` to initialise your project as a git repository
-- In Cursor: Ensure you've opened a git repository as your workspace
-- Use `fckgit_debug` tool to see what directory was detected
+### Problem: "Not a git repository"
 
-**"Wrong repository detected" or "Operations happen in wrong project"**
-- In Cursor: Just switch to the correct project - it auto-detects!
-- In Claude Desktop: Check your `cwd` setting in the config
-- Use `fckgit_debug` tool to see what workspace was detected
+**Solution:**
+1. Make sure you're in a git repository
+2. Run `git init` if you haven't initialised git yet
+3. In Cursor: Open the actual git repository folder, not a parent folder
 
-**"GEMINI_API_KEY environment variable not set"**
-- Add API key to your MCP config's `env` section
-- Get free key: https://makersuite.google.com/app/apikey
+### Problem: "Wrong repository detected"
 
-**"No module named 'mcp_server'"**
-- Run: `pip install -e ".[mcp]"` from the fckgit directory
-- This installs fckgit as a package so Python can find mcp_server
-- Make sure you're using the same Python that Cursor/Claude Desktop uses
+**Solution:**
+- **Cursor/VSCode:** Switch to the correct project in the IDE
+- **Claude Desktop:** Fix the `cwd` path in your config file
+- Ask your AI: "run fckgit_debug" to see what path was detected
 
-**"mcp not installed"** or **"psutil not installed"**
-- Run: `pip install -e ".[mcp]"` to install all MCP dependencies
-- Or manually: `pip install mcp psutil`
+### Problem: "GEMINI_API_KEY not set"
 
-**"Git command failed" or "Permission denied"**
-- Check file permissions on workspace directory
-- Verify git is in PATH: `git --version`
-- Check logs in stderr for detailed error messages
-- Try cleaning up git lock files: use `fckgit_cleanup_lock` tool
+**Solution:**
+1. Get free API key: https://makersuite.google.com/app/apikey
+2. Add it to your MCP config under `env` → `GEMINI_API_KEY`
+3. Restart your IDE
 
-**"Slow performance"**
-- Check cache hit rate via `fckgit_debug` tool
-- Network drives can be slow - consider using local clone
-- Very large repositories may need longer timeouts
-- Check Windows Defender exclusions for project directory
+### Problem: "No module named 'mcp_server'"
 
-**Tools not appearing in Cursor/Claude**
-- Restart Cursor or Claude Desktop after changing config
-- Check the MCP logs for errors (View > Output > MCP in Cursor)
-- Verify your config JSON syntax is valid
-- Try running test: `python scripts/test_mcp.py`
+**Solution:**
+```bash
+cd /path/to/fckgit
+pip install -e ".[mcp]"
+```
 
-**"Command injection" or "Security check failed"**
-- This is a protection feature - commands are validated
-- Don't use shell metacharacters in commit messages
-- Contact maintainers if false positive
+Then restart your IDE.
+
+### Problem: "Tools not showing up"
+
+**Solution:**
+1. Restart your IDE completely (not just reload)
+2. Check your config JSON is valid (no syntax errors)
+3. In Cursor: Check `View > Output > MCP` for errors
+
+### Problem: "fckgit_watch_status not detecting running process"
+
+**Solution:**
+This was a bug, fixed in v0.2.2. Update fckgit:
+```bash
+cd /path/to/fckgit
+pip install -e ".[mcp]"
+```
+
+Restart your IDE after updating.
 
 ## Advanced Configuration
 

@@ -25,7 +25,11 @@ The fckgit MCP server provides AI-powered git operations through the Model Conte
 
 **Why this approach?**
 
-Cursor/VSCode automatically provide the workspace path via the `WORKSPACE_FOLDER_PATHS` environment variable. This means the MCP server automatically works with the current project without any configuration! Users can still override this with `PROJECT_ROOT` if needed.
+**Auto-Detection for Modern IDEs:** Cursor and VSCode automatically provide the workspace path via the `WORKSPACE_FOLDER_PATHS` environment variable. This means the MCP server automatically works with the current project without any configuration!
+
+**Manual Configuration for Others:** For IDEs/clients that don't provide workspace info (Claude Desktop, JetBrains, Neovim, etc.), users set `cwd` in the MCP config, and the server uses `git rev-parse --show-toplevel` to find the actual git root.
+
+**Always Secure:** All paths are validated with security checks (path traversal, permissions, existence) before use.
 
 ### 2. Git Utilities (`git_utils.py`)
 
