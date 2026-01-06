@@ -70,3 +70,7 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+# Project proposals and planning docs
+*PROPOSAL*.md
+*_PROPOSAL.md
