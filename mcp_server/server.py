@@ -2,8 +2,9 @@ import asyncio
 import os
 import subprocess
 import sys
-import signal
-import psutil
+import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional
 
 try:
@@ -18,11 +19,21 @@ try:
 except ImportError:
     pass
 
+import psutil
 from mcp.server.models import InitializationOptions
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
 import mcp.server.stdio
 
+# Import our new modules
+from .workspace import WorkspaceDetector, WorkspaceError, InvalidWorkspaceError
+from .git_utils import detect_git_repo_type, check_git_available
+from .platform_utils import get_subprocess_kwargs, check_subprocess_security
+from .logging_config import setup_logging, init_logger
+
+# Initialize logging (stderr to not interfere with stdio protocol)
+setup_logging(level=os.environ.get('LOG_LEVEL', 'INFO'))
+logger = init_logger('mcp_server')
 
 # Configure Gemini
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -38,79 +49,167 @@ server = Server("fckgit")
 # Track running watch processes
 _watch_processes: dict[str, subprocess.Popen] = {}
 
-# Store the working directory - should be the fckgit repo root
-REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Initialize workspace detector
+_workspace_detector = WorkspaceDetector()
+
+# Detect workspace at startup
+try:
+    _workspace_path = _workspace_detector.detect_workspace()
+    logger.info("Workspace detected", workspace=str(_workspace_path))
+except WorkspaceError as e:
+    logger.error("Failed to detect workspace", error=str(e))
+    _workspace_path = Path.cwd()
+    logger.warning("Using current directory as fallback", workspace=str(_workspace_path))
 
 
-async def run_git_command(cmd: list[str]) -> tuple[str, str, int]:
-    """Run a git command and return stdout, stderr, returncode."""
+@dataclass
+class GitCommandResult:
+    """Result from a git command execution."""
+    stdout: str
+    stderr: str
+    returncode: int
+    duration: float  # seconds
+    command: str  # for logging/debugging
+
+
+async def run_git_command(
+    cmd: list[str],
+    cwd: Optional[Path] = None,
+    timeout: float = 15.0,
+    retry: int = 1
+) -> GitCommandResult:
+    """
+    Execute git command with proper error handling and security.
+    
+    Args:
+        cmd: Git command as list (e.g., ['git', 'status'])
+        cwd: Working directory (auto-detected if None)
+        timeout: Command timeout in seconds
+        retry: Number of retries for transient failures
+        
+    Returns:
+        GitCommandResult with stdout, stderr, returncode, duration
+        
+    Raises:
+        WorkspaceError: If workspace is invalid
+    """
+    start_time = time.time()
+    
+    # Security check
     try:
-        # On Windows, use shell=True for better process handling
-        import platform
-        is_windows = platform.system() == 'Windows'
-        
-        # Build subprocess kwargs
-        kwargs = {
-            'stdout': subprocess.PIPE,
-            'stderr': subprocess.PIPE,
-            'stdin': subprocess.DEVNULL,  # Close stdin to prevent hanging
-            'cwd': REPO_DIR,
-            'timeout': 15.0,
-            'text': True,
-            'shell': is_windows
-        }
-        
-        # Add Windows-specific flags
-        if is_windows:
-            kwargs['creationflags'] = 0x08000000  # CREATE_NO_WINDOW
-        
-        loop = asyncio.get_event_loop()
-        
-        # On Windows with shell=True, we need to properly quote arguments
-        if is_windows:
-            # Quote each argument that contains spaces or special characters
-            quoted_cmd = []
-            for arg in cmd:
-                if ' ' in arg or '"' in arg:
-                    # Escape quotes and wrap in quotes
-                    arg = arg.replace('"', '\\"')
-                    quoted_cmd.append(f'"{arg}"')
-                else:
-                    quoted_cmd.append(arg)
-            cmd_str = ' '.join(quoted_cmd)
-        else:
-            cmd_str = cmd
-        
-        result = await loop.run_in_executor(
-            None,
-            lambda: subprocess.run(
-                cmd_str if is_windows else cmd,
-                **kwargs
-            )
+        check_subprocess_security(cmd)
+    except ValueError as e:
+        logger.error("Subprocess security check failed", error=str(e), command=cmd)
+        return GitCommandResult(
+            stdout="",
+            stderr=f"Security check failed: {e}",
+            returncode=1,
+            duration=0.0,
+            command=' '.join(cmd)
         )
-        return result.stdout, result.stderr, result.returncode
-    except subprocess.TimeoutExpired:
-        return "", "Command timed out", 1
-    except Exception as e:
-        return "", str(e), 1
+    
+    # Determine working directory
+    if cwd is None:
+        try:
+            cwd = _workspace_path
+        except Exception as e:
+            logger.error("Failed to get workspace path", error=str(e))
+            return GitCommandResult(
+                stdout="",
+                stderr=f"Failed to determine workspace: {e}",
+                returncode=1,
+                duration=0.0,
+                command=' '.join(cmd)
+            )
+    
+    # Get platform-specific subprocess kwargs
+    kwargs = get_subprocess_kwargs(is_background=False, timeout=timeout)
+    kwargs['cwd'] = str(cwd)
+    
+    # Log command execution (without sensitive data)
+    cmd_str = ' '.join(cmd)
+    logger.debug("Executing git command", command=cmd_str, cwd=str(cwd))
+    
+    # Execute with retry logic
+    last_error = None
+    for attempt in range(retry + 1):
+        try:
+            loop = asyncio.get_event_loop()
+            
+            # Run command asynchronously
+            result = await loop.run_in_executor(
+                None,
+                lambda: subprocess.run(cmd, **kwargs)
+            )
+            
+            duration = time.time() - start_time
+            
+            logger.debug(
+                "Git command completed",
+                command=cmd_str,
+                returncode=result.returncode,
+                duration_ms=int(duration * 1000)
+            )
+            
+            return GitCommandResult(
+                stdout=result.stdout,
+                stderr=result.stderr,
+                returncode=result.returncode,
+                duration=duration,
+                command=cmd_str
+            )
+            
+        except subprocess.TimeoutExpired as e:
+            last_error = f"Command timed out after {timeout}s"
+            logger.warning(
+                "Git command timeout",
+                command=cmd_str,
+                timeout=timeout,
+                attempt=attempt + 1
+            )
+            if attempt < retry:
+                await asyncio.sleep(0.5)  # Brief delay before retry
+                continue
+                
+        except Exception as e:
+            last_error = str(e)
+            logger.error(
+                "Git command failed",
+                command=cmd_str,
+                error=str(e),
+                attempt=attempt + 1
+            )
+            if attempt < retry:
+                await asyncio.sleep(0.5)
+                continue
+    
+    # All retries exhausted
+    duration = time.time() - start_time
+    return GitCommandResult(
+        stdout="",
+        stderr=last_error or "Command failed",
+        returncode=1,
+        duration=duration,
+        command=cmd_str
+    )
 
 
 async def get_diff() -> str:
     """Get unstaged changes."""
-    stdout, _, returncode = await run_git_command(["git", "diff"])
-    return stdout if returncode == 0 else ""
+    result = await run_git_command(["git", "diff"])
+    return result.stdout if result.returncode == 0 else ""
 
 
 async def get_staged_diff() -> str:
     """Get staged changes."""
-    stdout, _, returncode = await run_git_command(["git", "diff", "--cached"])
-    return stdout if returncode == 0 else ""
+    result = await run_git_command(["git", "diff", "--cached"])
+    return result.stdout if result.returncode == 0 else ""
 
 
 async def get_git_status() -> str:
     """Get git status."""
-    stdout, _, returncode = await run_git_command(["git", "status", "--porcelain"])
-    return stdout if returncode == 0 else ""
+    result = await run_git_command(["git", "status", "--porcelain"])
+    return result.stdout if result.returncode == 0 else ""
 
 
 def generate_commit_message(diff: str) -> str:
@@ -212,12 +311,14 @@ Output ONLY the professional commit message, nothing else."""
 
 def cleanup_git_lock():
     """Remove stale git lock file if it exists."""
-    lock_file = ".git/index.lock"
-    if os.path.exists(lock_file):
+    lock_file = _workspace_path / ".git" / "index.lock"
+    if lock_file.exists():
         try:
-            os.remove(lock_file)
+            lock_file.unlink()
+            logger.debug("Cleaned up git lock file", lock_file=str(lock_file))
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to clean up git lock file", lock_file=str(lock_file), error=str(e))
             return False
     return False
 
@@ -227,19 +328,19 @@ async def commit_changes(message: str, stage_all: bool = True) -> tuple[bool, st
     cleanup_git_lock()
     
     if stage_all:
-        _, _, returncode = await run_git_command(["git", "add", "-A"])
-        if returncode != 0:
+        result = await run_git_command(["git", "add", "-A"])
+        if result.returncode != 0:
             return False, "Failed to stage files"
     
-    stdout, stderr, returncode = await run_git_command(["git", "commit", "-m", message])
+    result = await run_git_command(["git", "commit", "-m", message])
     
-    if returncode == 0:
+    if result.returncode == 0:
         # Get the commit hash
-        hash_stdout, _, hash_returncode = await run_git_command(["git", "rev-parse", "--short", "HEAD"])
-        commit_hash = hash_stdout.strip() if hash_returncode == 0 else "unknown"
+        hash_result = await run_git_command(["git", "rev-parse", "--short", "HEAD"])
+        commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
         return True, f"Committed successfully [{commit_hash}]: {message}"
     else:
-        error_msg = stderr.strip() or stdout.strip() or "Unknown error"
+        error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
         if "nothing to commit" in error_msg.lower():
             return False, "Nothing to commit"
         return False, f"Commit failed: {error_msg}"
@@ -247,22 +348,22 @@ async def commit_changes(message: str, stage_all: bool = True) -> tuple[bool, st
 
 async def push_to_remote() -> tuple[bool, str]:
     """Push to remote repository."""
-    stdout, stderr, returncode = await run_git_command(["git", "push"])
+    result = await run_git_command(["git", "push"])
     
-    if returncode == 0:
+    if result.returncode == 0:
         return True, "Successfully pushed to remote"
     
-    error_msg = stderr.strip() or stdout.strip() or "Unknown error"
+    error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
     
     # Try to handle rejected push
     if "rejected" in error_msg.lower() or "fetch first" in error_msg.lower():
         # Try to pull with rebase
-        _, _, pull_returncode = await run_git_command(["git", "pull", "--rebase"])
+        pull_result = await run_git_command(["git", "pull", "--rebase"])
         
-        if pull_returncode == 0:
+        if pull_result.returncode == 0:
             # Try pushing again
-            _, _, retry_returncode = await run_git_command(["git", "push"])
-            if retry_returncode == 0:
+            retry_result = await run_git_command(["git", "push"])
+            if retry_result.returncode == 0:
                 return True, "Pulled, rebased, and pushed successfully"
             return False, "Failed to push after rebase"
         return False, "Failed to pull for rebase"
@@ -272,10 +373,10 @@ async def push_to_remote() -> tuple[bool, str]:
 
 async def get_repo_path() -> str:
     """Get the current repository root path."""
-    stdout, _, returncode = await run_git_command(["git", "rev-parse", "--show-toplevel"])
-    if returncode == 0:
-        return stdout.strip()
-    return os.getcwd()
+    result = await run_git_command(["git", "rev-parse", "--show-toplevel"])
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return str(_workspace_path)
 
 
 def find_fckgit_processes() -> list[dict[str, Any]]:
@@ -308,9 +409,12 @@ async def start_watch_mode(cooldown: int = 30, faang_mode: bool = False) -> tupl
     repo_path = await get_repo_path()
     
     # Check if already running in this repo
+    # Normalize paths for comparison (handles Windows forward/backslash differences)
+    repo_path_normalized = str(Path(repo_path).resolve())
     existing = find_fckgit_processes()
     for proc in existing:
-        if proc['cwd'] == repo_path:
+        proc_cwd_normalized = str(Path(proc['cwd']).resolve()) if proc['cwd'] != 'unknown' else 'unknown'
+        if proc_cwd_normalized == repo_path_normalized:
             return False, f"fckgit watch already running (PID: {proc['pid']})", proc['pid']
     
     # Build command with cooldown and faang mode
@@ -369,9 +473,12 @@ async def stop_watch_mode(pid: Optional[int] = None) -> tuple[bool, str]:
             return False, f"Failed to stop process {pid}: {str(e)}"
     
     # Otherwise, find and stop process for current repo
+    # Normalize paths for comparison (handles Windows forward/backslash differences)
+    repo_path_normalized = str(Path(repo_path).resolve())
     existing = find_fckgit_processes()
     for proc_info in existing:
-        if proc_info['cwd'] == repo_path:
+        proc_cwd_normalized = str(Path(proc_info['cwd']).resolve()) if proc_info['cwd'] != 'unknown' else 'unknown'
+        if proc_cwd_normalized == repo_path_normalized:
             try:
                 proc = psutil.Process(proc_info['pid'])
                 proc.terminate()
@@ -391,9 +498,21 @@ async def get_watch_status() -> tuple[bool, str]:
     repo_path = await get_repo_path()
     existing = find_fckgit_processes()
     
+    # Normalize paths for comparison (handles Windows forward/backslash differences)
+    repo_path_normalized = str(Path(repo_path).resolve())
+    
     for proc in existing:
-        if proc['cwd'] == repo_path:
+        proc_cwd_normalized = str(Path(proc['cwd']).resolve()) if proc['cwd'] != 'unknown' else 'unknown'
+        if proc_cwd_normalized == repo_path_normalized:
             return True, f"fckgit watch is running (PID: {proc['pid']})"
+    
+    # Enhanced debugging info if not found
+    if existing:
+        debug_info = f"fckgit watch is not running in this repo.\n\nDetected repo: {repo_path_normalized}\n\nRunning fckgit processes:"
+        for proc in existing:
+            proc_cwd_normalized = str(Path(proc['cwd']).resolve()) if proc['cwd'] != 'unknown' else 'unknown'
+            debug_info += f"\n  PID {proc['pid']}: {proc_cwd_normalized}"
+        return False, debug_info
     
     return False, "fckgit watch is not running"
 
@@ -586,28 +705,52 @@ async def handle_call_tool(
     # Debug tool doesn't require git repo
     if name == "fckgit_debug":
         import os.path
+        
         debug_info = {
-            "REPO_DIR": REPO_DIR,
-            "REPO_DIR_exists": os.path.exists(REPO_DIR),
-            "is_directory": os.path.isdir(REPO_DIR),
-            "cwd": os.getcwd(),
+            "workspace_path": str(_workspace_path),
+            "workspace_exists": _workspace_path.exists(),
+            "workspace_is_dir": _workspace_path.is_dir(),
+            "cwd": str(Path.cwd()),
             "__file__": __file__,
         }
-        # Check if .git exists
-        git_dir = os.path.join(REPO_DIR, ".git")
-        debug_info[".git_exists"] = os.path.exists(git_dir)
+        
+        # Git repository info
+        git_info = detect_git_repo_type(_workspace_path)
+        if git_info:
+            debug_info["git_root"] = str(git_info.root)
+            debug_info["git_dir"] = str(git_info.git_dir)
+            debug_info["is_worktree"] = git_info.is_worktree
+            debug_info["is_submodule"] = git_info.is_submodule
+            debug_info["is_bare"] = git_info.is_bare
+            if git_info.superproject_root:
+                debug_info["superproject_root"] = str(git_info.superproject_root)
+        else:
+            debug_info["git_repository"] = False
+        
+        # Show ALL environment variables to see what Cursor provides
+        import os
+        env_vars = {}
+        for var in os.environ:
+            if any(keyword in var.upper() for keyword in ['CURSOR', 'VSCODE', 'PROJECT', 'WORKSPACE', 'PWD', 'CWD', 'DIR']):
+                env_vars[var] = os.environ[var]
+        debug_info["environment_vars"] = env_vars
+        debug_info["all_env_count"] = len(os.environ)
         
         # Try running git status
-        stdout, stderr, returncode = await run_git_command(["git", "status", "--porcelain"])
-        debug_info["git_status_returncode"] = returncode
-        debug_info["git_status_stdout"] = stdout[:200] if stdout else ""
-        debug_info["git_status_stderr"] = stderr[:200] if stderr else ""
+        result = await run_git_command(["git", "status", "--porcelain"])
+        debug_info["git_status_returncode"] = result.returncode
+        debug_info["git_status_stdout"] = result.stdout[:200] if result.stdout else ""
+        debug_info["git_status_stderr"] = result.stderr[:200] if result.stderr else ""
+        
+        # Cache stats
+        cache_stats = _workspace_detector.get_cache_stats()
+        debug_info["cache_stats"] = cache_stats
         
         return [types.TextContent(type="text", text=str(debug_info))]
     
     # Check if in git repo (skip for debug tool)
-    _, _, returncode = await run_git_command(["git", "rev-parse", "--git-dir"])
-    if returncode != 0:
+    result = await run_git_command(["git", "rev-parse", "--git-dir"])
+    if result.returncode != 0:
         return [types.TextContent(
             type="text",
             text="Error: Not a git repository"

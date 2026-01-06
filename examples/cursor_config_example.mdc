@@ -1,12 +1,13 @@
-# Example Cursor MCP Configuration for fckgit
+﻿# Example Cursor MCP Configuration for fckgit
 # Add this to your Cursor MCP settings
 
+# Recommended configuration - auto-detects your workspace!
+# Just add your API key and go. Switch projects in Cursor and fckgit follows automatically.
 mcpServers:
   fckgit:
     command: python
     args:
       - "-m"
       - "mcp_server"
-    cwd: "c:\\Users\\Fab2\\Desktop\\AI\\_tools\\_fckgit"
     env:
       GEMINI_API_KEY: "your_api_key_here"

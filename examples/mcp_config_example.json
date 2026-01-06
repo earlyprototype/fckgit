@@ -3,7 +3,6 @@
     "fckgit": {
       "command": "python",
       "args": ["-m", "mcp_server"],
-      "cwd": "/path/to/fckgit",
       "env": {
         "GEMINI_API_KEY": "your_api_key_here"
       }

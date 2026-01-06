@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.2.2] - 2026-01-06
+
+### Added
+- **Automatic workspace detection for Cursor** - MCP server now automatically detects which project you're working on
+- `WORKSPACE_FOLDER_PATHS` environment variable support (provided by Cursor/VSCode)
+- Comprehensive workspace detection with multiple fallback strategies
+- New `workspace.py` module for robust workspace detection
+- New `git_utils.py` module for handling git edge cases
+- New `platform_utils.py` module for platform-specific subprocess handling
+- New `logging_config.py` module for structured logging
+- Comprehensive test suite for workspace detection, git utilities, and platform utilities
+- Support for git worktrees, submodules, and bare repositories
+- Thread-safe workspace caching with configurable TTL
+
+### Changed
+- Workspace detection now prioritises `WORKSPACE_FOLDER_PATHS` (automatic from Cursor)
+- `run_git_command()` refactored for better security and reliability
+- Removed `shell=True` from all subprocess calls (security improvement)
+- Documentation simplified - Cursor users need zero configuration beyond API key
+- `PROJECT_ROOT` and `cwd` moved to "Advanced Configuration" section
+- MCP server now works out of the box when switching between Cursor projects
+
+### Fixed
+- MCP server no longer points to wrong directory when used in different Cursor projects
+- Path traversal vulnerabilities eliminated with proper path sanitisation
+- Command injection vulnerabilities eliminated by removing shell execution
+- Windows UNC path and long path support improved
+
+### Security
+- Never uses `shell=True` in subprocess calls
+- Path sanitisation with security checks
+- Command validation to prevent injection attacks
+- Permission checks on workspace directories
+
+### Performance
+- LRU cache with 60s TTL for workspace detection
+- Sub-millisecond cached workspace lookups
+- Retry logic for transient git command failures
+
 ## [0.2.1] - 2026-01-03
 
 ### Added
