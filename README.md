@@ -1,10 +1,7 @@
 # fckgit
 
 <p align="center">
-  <video width="100%" autoplay loop muted playsinline>
-    <source src="assets/Gen-4_Turbo_Animate_motion_of_lasers_and_lightbeams_2863361030.mp4" type="video/mp4">
-    <img src="assets/banner.jpg" alt="fckgit - ZERO COMMITS GIVEN" width="100%"/>
-  </video>
+  <img src="https://github.com/user-attachments/assets/997d8eee-b56a-4256-b911-29a6c84c5e53" alt="fckgit - ZERO COMMITS GIVEN" width="100%"/>
 </p>
 
 <p align="center">
