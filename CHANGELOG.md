@@ -15,6 +15,9 @@
 - `start_watch_mode()` in MCP server now accepts `cooldown` and `faang_mode` parameters
 - MCP blastoff tool now shows actual cooldown value and mode in response message
 
+### Fixed
+- Custom `--cooldown` values now properly passed to `GitChangeHandler` in watch mode (was always defaulting to 30 seconds)
+
 ### Features
 - Users can customize auto-commit frequency via `--cooldown` flag
 - MCP users can specify cooldown when launching blastoff mode
