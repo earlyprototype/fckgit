@@ -1,6 +1,10 @@
 # fckgit
 
-https://github.com/user-attachments/assets/997d8eee-b56a-4256-b911-29a6c84c5e53
+<div align="center">
+
+![fckgit](https://github.com/user-attachments/assets/997d8eee-b56a-4256-b911-29a6c84c5e53)
+
+</div>
 
 <p align="center">
   <img src="https://img.shields.io/badge/commits-automatic-ff69b4?style=for-the-badge" alt="Automatic Commits"/>
