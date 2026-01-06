@@ -1,8 +1,6 @@
 # fckgit
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/997d8eee-b56a-4256-b911-29a6c84c5e53" alt="fckgit - ZERO COMMITS GIVEN" width="100%"/>
-</p>
+https://github.com/user-attachments/assets/997d8eee-b56a-4256-b911-29a6c84c5e53
 
 <p align="center">
   <img src="https://img.shields.io/badge/commits-automatic-ff69b4?style=for-the-badge" alt="Automatic Commits"/>
