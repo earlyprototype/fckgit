@@ -1,0 +1,85 @@
+# Timepon Ignore Patterns
+# Lines starting with # are comments
+# Patterns follow .gitignore syntax
+
+# Dependencies
+node_modules/
+bower_components/
+vendor/
+packages/
+
+# Build outputs
+dist/
+build/
+out/
+target/
+*.min.js
+*.min.css
+
+# IDE & Editor
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# Version control
+.git/
+.svn/
+.hg/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temp files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Test coverage
+coverage/
+.nyc_output/
+htmlcov/
+*.cover
+
+# Cache
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vuepress/dist
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+credentials.json
+
+# Timepon internal
+_timepon.yaml
+_timepon.yaml.backup.*
+
+# Large binary/media files (optional - uncomment if needed)
+# *.mp4
+# *.mov
+# *.avi
+# *.pdf
+# *.zip
+# *.tar.gz

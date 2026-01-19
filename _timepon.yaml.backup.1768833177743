@@ -1,0 +1,457 @@
+TIMEPON FILE TRACKING
+C:\Users\Fab2\Desktop\AI\_tools\_fckgit
+==========================================================================
+Last Updated:     Monday, 19 January 2026 at 12:19:09
+Files Tracked:    68
+
+TIP: Use code folding to collapse folders (click arrows by line numbers)
+
+Ctrl+K Ctrl+0 = fold all | Ctrl+K Ctrl+J = unfold all
+==========================================================================
+
+workspace: C:\Users\Fab2\Desktop\AI\_tools\_fckgit
+lastUpdated: '2026-01-19T12:19:09.608Z'
+totalFiles: 68
+
+files:
+
+  # === 🏠 Root
+  Root:
+    # === 📁 __pycache__
+    __pycache__:
+      # 📄 fckgit.cpython-312.pyc  >> 1w ago <<
+      fckgit.cpython-312.pyc:
+        created: 06 Jan 2026 16:13 >>(1w ago)<<
+        summary: .pyc file
+        tags: [pyc]
+
+      # 📄 __init__.cpython-312.pyc  >> 1w ago <<
+      __init__.cpython-312.pyc:
+        created: 06 Jan 2026 16:13 >>(1w ago)<<
+        summary: .pyc file
+        tags: [pyc]
+
+    # === 📁 .github
+    .github:
+      # === 📁 ISSUE_TEMPLATE
+      ISSUE_TEMPLATE:
+        # 📄 feature_request.md  >> 1w ago <<
+        feature_request.md:
+          created: 05 Jan 2026 23:07 >>(1w ago)<<
+          summary: Feature Description
+          tags: [md, docs]
+
+        # 📄 bug_report.md  >> 1w ago <<
+        bug_report.md:
+          created: 05 Jan 2026 23:06 >>(1w ago)<<
+          summary: What Happened
+          tags: [md, docs]
+
+      # 📄 pull_request_template.md  >> 1w ago <<
+      pull_request_template.md:
+        created: 05 Jan 2026 23:07 >>(1w ago)<<
+        summary: Description
+        tags: [md, docs]
+
+    # === 📁 .pytest_cache
+    .pytest_cache:
+      # === 📁 v
+      v:
+        # === 📁 cache
+        cache:
+          # 📄 stepwise  >> 1w ago <<
+          stepwise:
+            created: 06 Jan 2026 16:14 >>(1w ago)<<
+            summary: []
+            tags: []
+
+          # 📄 lastfailed  >> 1w ago <<
+          lastfailed:
+            created: 06 Jan 2026 16:14 >>(1w ago)<<
+            summary: {}
+            tags: []
+
+          # 📄 nodeids  >> 1w ago <<
+          nodeids:
+            created: 06 Jan 2026 16:14 >>(1w ago)<<
+            summary: [
+            tags: []
+
+      # 📄 CACHEDIR.TAG  >> 1w ago <<
+      CACHEDIR.TAG:
+        created: 06 Jan 2026 16:14 >>(1w ago)<<
+        summary: Signature: 8a477f597d28d172789f06886806bc55
+        tags: [TAG]
+
+      # 📄 .gitignore  >> 1w ago <<
+      .gitignore:
+        created: 06 Jan 2026 16:14 >>(1w ago)<<
+        summary: # Created by pytest automatically.
+        tags: []
+
+      # 📄 README.md  >> 1w ago <<
+      README.md:
+        created: 06 Jan 2026 16:14 >>(1w ago)<<
+        summary: pytest cache directory #
+        tags: [md, docs]
+
+    # === 📁 assets
+    assets:
+      # 📄 banner.gif  >> 1w ago <<
+      banner.gif:
+        created: 06 Jan 2026 11:54 >>(1w ago)<<
+        summary: .gif file
+        tags: [gif]
+
+      # 📄 Gen-4_Turbo_Animate_motion_of_lasers_and_lightbeams_2863361030.mp4  >> 1w ago <<
+      Gen-4_Turbo_Animate_motion_of_lasers_and_lightbeams_2863361030.mp4:
+        created: 06 Jan 2026 11:40 >>(1w ago)<<
+        summary: .mp4 file
+        tags: [mp4]
+
+      # 📄 banner.jpg  >> 2w ago <<
+      banner.jpg:
+        created: 03 Jan 2026 03:38 >>(2w ago)<<
+        summary: .jpg file
+        tags: [jpg]
+
+    # === 📁 examples
+    examples:
+      # 📄 cursor_config_example.mdc  >> 2w ago <<
+      cursor_config_example.mdc:
+        created: 03 Jan 2026 07:49 >>(2w ago)<<
+        summary: ﻿# Example Cursor MCP Configuration for fckgit
+        tags: [mdc]
+
+      # 📋 mcp_config_example.json  >> 2w ago <<
+      mcp_config_example.json:
+        created: 03 Jan 2026 07:22 >>(2w ago)<<
+        summary: {
+        tags: [json, config]
+
+    # === 📁 fckgit.egg-info
+    fckgit.egg-info:
+      # 📄 PKG-INFO  >> 31m ago <<
+      PKG-INFO:
+        created: 19 Jan 2026 11:47 >>(31m ago)<<
+        summary: Metadata-Version: 2.4
+        tags: []
+
+      # 📝 SOURCES.txt  >> 2w ago <<
+      SOURCES.txt:
+        created: 03 Jan 2026 02:02 >>(2w ago)<<
+        summary: CHANGELOG.md
+        tags: [txt, docs]
+
+      # 📝 top_level.txt  >> 2w ago <<
+      top_level.txt:
+        created: 03 Jan 2026 02:02 >>(2w ago)<<
+        summary: fckgit
+        tags: [txt, docs]
+
+      # 📝 requires.txt  >> 2w ago <<
+      requires.txt:
+        created: 03 Jan 2026 02:02 >>(2w ago)<<
+        summary: google-genai>=1.0.0
+        tags: [txt, docs]
+
+      # 📝 entry_points.txt  >> 2w ago <<
+      entry_points.txt:
+        created: 03 Jan 2026 02:02 >>(2w ago)<<
+        summary: [console_scripts]
+        tags: [txt, docs]
+
+      # 📝 dependency_links.txt  >> 2w ago <<
+      dependency_links.txt:
+        created: 03 Jan 2026 02:02 >>(2w ago)<<
+        summary: dependency_links.txt
+        tags: [txt, docs]
+
+    # === 📁 mcp_server
+    mcp_server:
+      # === 📁 __pycache__
+      __pycache__:
+        # 📄 server.cpython-312.pyc  >> 1w ago <<
+        server.cpython-312.pyc:
+          created: 06 Jan 2026 21:35 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 logging_config.cpython-312.pyc  >> 1w ago <<
+        logging_config.cpython-312.pyc:
+          created: 06 Jan 2026 20:55 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 platform_utils.cpython-312.pyc  >> 1w ago <<
+        platform_utils.cpython-312.pyc:
+          created: 06 Jan 2026 20:55 >>(1w ago)<<
+          summary: �
+          tags: [pyc]
+
+        # 📄 git_utils.cpython-312.pyc  >> 1w ago <<
+        git_utils.cpython-312.pyc:
+          created: 06 Jan 2026 20:55 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 workspace.cpython-312.pyc  >> 1w ago <<
+        workspace.cpython-312.pyc:
+          created: 06 Jan 2026 20:55 >>(1w ago)<<
+          summary: �
+          tags: [pyc]
+
+        # 📄 __main__.cpython-312.pyc  >> 1w ago <<
+        __main__.cpython-312.pyc:
+          created: 05 Jan 2026 17:32 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 __init__.cpython-312.pyc  >> 1w ago <<
+        __init__.cpython-312.pyc:
+          created: 05 Jan 2026 17:30 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+      # 📄 README.md  >> 1w ago <<
+      README.md:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary: fckgit MCP Server - Technical Documentation
+        tags: [md, docs, api]
+
+      # 🐍 logging_config.py  >> 1w ago <<
+      logging_config.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary:     # Use stderr to not interfere with stdio protocol
+        tags: [py, code]
+
+      # 🐍 platform_utils.py  >> 1w ago <<
+      platform_utils.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary:     # Windows-specific configuration
+        tags: [py, code]
+
+      # 🐍 git_utils.py  >> 1w ago <<
+      git_utils.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary:         # Get repository root
+        tags: [py, code]
+
+      # 🐍 workspace.py  >> 1w ago <<
+      workspace.py:
+        created: 06 Jan 2026 16:05 >>(1w ago)<<
+        summary:             # Return cached workspace if already initialized and no override
+        tags: [py, code]
+
+      # 🐍 server.py  >> 2w ago <<
+      server.py:
+        created: 03 Jan 2026 07:25 >>(2w ago)<<
+        summary: Import our new modules
+        tags: [py, code]
+
+      # 🐍 __main__.py  >> 2w ago <<
+      __main__.py:
+        created: 03 Jan 2026 07:24 >>(2w ago)<<
+        summary: py source file
+        tags: [py, code]
+
+      # 🐍 __init__.py  >> 2w ago <<
+      __init__.py:
+        created: 03 Jan 2026 07:24 >>(2w ago)<<
+        summary: py source file
+        tags: [py, code]
+
+    # === 📁 scripts
+    scripts:
+      # 🔧 install_mcp.sh  >> 2w ago <<
+      install_mcp.sh:
+        created: 03 Jan 2026 07:27 >>(2w ago)<<
+        summary: #!/bin/bash
+        tags: [sh]
+
+      # 🔧 install_mcp.ps1  >> 2w ago <<
+      install_mcp.ps1:
+        created: 03 Jan 2026 07:27 >>(2w ago)<<
+        summary: # fckgit MCP Server Installation Script for Windows
+        tags: [ps1]
+
+      # 🐍 test_mcp.py  >> 2w ago <<
+      test_mcp.py:
+        created: 03 Jan 2026 07:26 >>(2w ago)<<
+        summary: Test 1: Check Python imports
+        tags: [py, code]
+
+      # 🔧 install.ps1  >> 2w ago <<
+      install.ps1:
+        created: 03 Jan 2026 03:50 >>(2w ago)<<
+        summary: # fckgit - One Click Install (It's Safe!)
+        tags: [ps1]
+
+      # 🔧 install.sh  >> 2w ago <<
+      install.sh:
+        created: 03 Jan 2026 03:49 >>(2w ago)<<
+        summary: #!/bin/bash
+        tags: [sh]
+
+    # === 📁 tests
+    tests:
+      # === 📁 __pycache__
+      __pycache__:
+        # 📄 test_git_utils.cpython-312-pytest-8.3.2.pyc  >> 1w ago <<
+        test_git_utils.cpython-312-pytest-8.3.2.pyc:
+          created: 06 Jan 2026 16:16 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 conftest.cpython-312-pytest-8.3.2.pyc  >> 1w ago <<
+        conftest.cpython-312-pytest-8.3.2.pyc:
+          created: 06 Jan 2026 16:16 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 test_workspace.cpython-312-pytest-8.3.2.pyc  >> 1w ago <<
+        test_workspace.cpython-312-pytest-8.3.2.pyc:
+          created: 06 Jan 2026 16:13 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 test_platform_utils.cpython-312-pytest-8.3.2.pyc  >> 1w ago <<
+        test_platform_utils.cpython-312-pytest-8.3.2.pyc:
+          created: 06 Jan 2026 16:13 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+        # 📄 __init__.cpython-312.pyc  >> 1w ago <<
+        __init__.cpython-312.pyc:
+          created: 06 Jan 2026 16:13 >>(1w ago)<<
+          summary: .pyc file
+          tags: [pyc]
+
+      # 🐍 test_platform_utils.py  >> 1w ago <<
+      test_platform_utils.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary:             # On Unix, different handling
+        tags: [py, code]
+
+      # 🐍 test_git_utils.py  >> 1w ago <<
+      test_git_utils.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary:         # Bare repositories may not have a working tree to detect from
+        tags: [py, code]
+
+      # 🐍 test_workspace.py  >> 1w ago <<
+      test_workspace.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary:         # Change to git repo directory
+        tags: [py, code]
+
+      # 🐍 conftest.py  >> 1w ago <<
+      conftest.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary:     # Initialize git repo
+        tags: [py, code]
+
+      # 🐍 __init__.py  >> 1w ago <<
+      __init__.py:
+        created: 06 Jan 2026 17:32 >>(1w ago)<<
+        summary: py source file
+        tags: [py, code]
+
+    # 📄 .tponignore  >> just now <<
+    .tponignore:
+      created: 19 Jan 2026 12:19 >>(just now)<<
+      summary: # Timepon Ignore Patterns
+      tags: []
+
+    # 📄 DIAGNOSTIC_FINDINGS.md  >> 21m ago <<
+    DIAGNOSTIC_FINDINGS.md:
+      created: 19 Jan 2026 11:58 >>(21m ago)<<
+      summary: Workspace Detection Diagnostic Findings
+      tags: [md, docs]
+
+    # 📄 STAKEHOLDER_TRANSLATOR_PROPOSAL.md  >> 1w ago <<
+    STAKEHOLDER_TRANSLATOR_PROPOSAL.md:
+      created: 06 Jan 2026 12:08 >>(1w ago)<<
+      summary: Stakeholder Translator - Project Proposal
+      tags: [md, docs, api]
+
+    # 📄 CONTRIBUTING.md  >> 1w ago <<
+    CONTRIBUTING.md:
+      created: 05 Jan 2026 23:06 >>(1w ago)<<
+      summary: Contributing to fckgit
+      tags: [md, docs, tasks]
+
+    # 📄 MCP_SETUP.md  >> 1w ago <<
+    MCP_SETUP.md:
+      created: 05 Jan 2026 16:44 >>(1w ago)<<
+      summary: fckgit MCP Server Setup
+      tags: [md, docs, api]
+
+    # 📄 SILICON_VALLEY.md  >> 2w ago <<
+    SILICON_VALLEY.md:
+      created: 03 Jan 2026 07:37 >>(2w ago)<<
+      summary: fckgit Silicon Valley Mode
+      tags: [md, docs, api]
+
+    # 📄 CHANGELOG.md  >> 2w ago <<
+    CHANGELOG.md:
+      created: 03 Jan 2026 07:28 >>(2w ago)<<
+      summary: Changelog
+      tags: [md, docs, api]
+
+    # 📄 MANIFEST.in  >> 2w ago <<
+    MANIFEST.in:
+      created: 03 Jan 2026 07:26 >>(2w ago)<<
+      summary: include README.md
+      tags: [in]
+
+    # 🐍 __main__.py  >> 2w ago <<
+    __main__.py:
+      created: 03 Jan 2026 07:23 >>(2w ago)<<
+      summary: py source file
+      tags: [py, code]
+
+    # 🐍 __init__.py  >> 2w ago <<
+    __init__.py:
+      created: 03 Jan 2026 07:22 >>(2w ago)<<
+      summary: py source file
+      tags: [py, code]
+
+    # 📄 pyproject.toml  >> 2w ago <<
+    pyproject.toml:
+      created: 03 Jan 2026 07:22 >>(2w ago)<<
+      summary: [build-system]
+      tags: [toml, config]
+
+    # 📄 LICENSE  >> 2w ago <<
+    LICENSE:
+      created: 03 Jan 2026 01:46 >>(2w ago)<<
+      summary: MIT License - its basically not a licence, go nuts.
+      tags: []
+
+    # 📄 .gitignore  >> 2w ago <<
+    .gitignore:
+      created: 03 Jan 2026 01:46 >>(2w ago)<<
+      summary: # Byte-compiled / optimized / DLL files
+      tags: []
+
+    # 📄 README.md  >> 2w ago <<
+    README.md:
+      created: 03 Jan 2026 01:46 >>(2w ago)<<
+      summary: fckgit
+      tags: [md, docs, tasks]
+
+    # 🐍 setup.py  >> 2w ago <<
+    setup.py:
+      created: 03 Jan 2026 01:46 >>(2w ago)<<
+      summary: py source file
+      tags: [py, code]
+
+    # 🐍 fckgit.py  >> 2w ago <<
+    fckgit.py:
+      created: 03 Jan 2026 01:46 >>(2w ago)<<
+      summary: Fix Windows console encoding for emojis
+      tags: [py, code]
+==========================================================================
+End of Timepon tracking data
+==========================================================================

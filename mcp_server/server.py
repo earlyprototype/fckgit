@@ -135,10 +135,10 @@ async def run_git_command(
     for attempt in range(retry + 1):
         try:
             loop = asyncio.get_event_loop()
-            
+        
             # Run command asynchronously
             result = await loop.run_in_executor(
-                None,
+            None,
                 lambda: subprocess.run(cmd, **kwargs)
             )
             
@@ -705,16 +705,63 @@ async def handle_call_tool(
     # Debug tool doesn't require git repo
     if name == "fckgit_debug":
         import os.path
+        import datetime
         
-        debug_info = {
-            "workspace_path": str(_workspace_path),
-            "workspace_exists": _workspace_path.exists(),
-            "workspace_is_dir": _workspace_path.is_dir(),
-            "cwd": str(Path.cwd()),
-            "__file__": __file__,
-        }
+        debug_info = {}
         
-        # Git repository info
+        # === WORKSPACE DETECTION DIAGNOSTICS ===
+        debug_info["=== WORKSPACE DETECTION ==="] = ""
+        
+        # Current workspace info from detector
+        workspace_info = _workspace_detector.get_workspace_info()
+        debug_info["workspace_path"] = str(_workspace_path)
+        debug_info["workspace_exists"] = _workspace_path.exists()
+        debug_info["workspace_is_dir"] = _workspace_path.is_dir()
+        debug_info["detection_method"] = workspace_info.get('detection_method', 'unknown')
+        
+        if workspace_info.get('detection_timestamp'):
+            timestamp = workspace_info['detection_timestamp']
+            debug_info["detected_at"] = datetime.datetime.fromtimestamp(timestamp).isoformat()
+            debug_info["seconds_since_detection"] = round(workspace_info.get('time_since_detection', 0), 2)
+        
+        # Current process info
+        debug_info["current_cwd"] = str(Path.cwd())
+        debug_info["mcp_server_file"] = __file__
+        
+        # Try to re-detect workspace NOW (without cache) to see if it would differ
+        try:
+            fresh_workspace = _workspace_detector._use_git_command(Path.cwd())
+            if fresh_workspace:
+                debug_info["fresh_detection_would_give"] = str(fresh_workspace)
+                debug_info["WORKSPACE_MISMATCH"] = str(fresh_workspace) != str(_workspace_path)
+        except Exception as e:
+            debug_info["fresh_detection_error"] = str(e)
+        
+        # === ENVIRONMENT VARIABLES ===
+        debug_info["=== ENVIRONMENT VARIABLES ==="] = ""
+        
+        import os
+        env_vars = {}
+        # Show ALL potentially relevant env vars
+        for var in sorted(os.environ.keys()):
+            if any(keyword in var.upper() for keyword in ['CURSOR', 'VSCODE', 'PROJECT', 'WORKSPACE', 'PWD', 'CWD', 'DIR', 'ROOT', 'PATH']):
+                value = os.environ[var]
+                # Truncate very long values (like PATH)
+                if len(value) > 500:
+                    env_vars[var] = value[:500] + "... (truncated)"
+                else:
+                    env_vars[var] = value
+        
+        debug_info["env_vars"] = env_vars
+        debug_info["total_env_vars"] = len(os.environ)
+        
+        # Specifically check for workspace detection vars
+        debug_info["WORKSPACE_FOLDER_PATHS_present"] = "WORKSPACE_FOLDER_PATHS" in os.environ
+        debug_info["PROJECT_ROOT_present"] = "PROJECT_ROOT" in os.environ
+        
+        # === GIT REPOSITORY INFO ===
+        debug_info["=== GIT REPOSITORY ==="] = ""
+        
         git_info = detect_git_repo_type(_workspace_path)
         if git_info:
             debug_info["git_root"] = str(git_info.root)
@@ -727,22 +774,18 @@ async def handle_call_tool(
         else:
             debug_info["git_repository"] = False
         
-        # Show ALL environment variables to see what Cursor provides
-        import os
-        env_vars = {}
-        for var in os.environ:
-            if any(keyword in var.upper() for keyword in ['CURSOR', 'VSCODE', 'PROJECT', 'WORKSPACE', 'PWD', 'CWD', 'DIR']):
-                env_vars[var] = os.environ[var]
-        debug_info["environment_vars"] = env_vars
-        debug_info["all_env_count"] = len(os.environ)
-        
         # Try running git status
         result = await run_git_command(["git", "status", "--porcelain"])
         debug_info["git_status_returncode"] = result.returncode
-        debug_info["git_status_stdout"] = result.stdout[:200] if result.stdout else ""
-        debug_info["git_status_stderr"] = result.stderr[:200] if result.stderr else ""
+        debug_info["git_status_success"] = result.returncode == 0
+        if result.returncode != 0:
+            debug_info["git_status_error"] = result.stderr[:200] if result.stderr else ""
+        else:
+            changes_count = len([l for l in result.stdout.split('\n') if l.strip()])
+            debug_info["git_changes_detected"] = changes_count
         
-        # Cache stats
+        # === CACHE STATS ===
+        debug_info["=== CACHE STATS ==="] = ""
         cache_stats = _workspace_detector.get_cache_stats()
         debug_info["cache_stats"] = cache_stats
         

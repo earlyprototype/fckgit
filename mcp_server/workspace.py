@@ -62,6 +62,8 @@ class WorkspaceDetector:
         self._cache_ttl = cache_ttl
         self._workspace: Optional[Path] = None
         self._initialized = False
+        self._detection_timestamp: Optional[float] = None
+        self._detection_method: Optional[str] = None
     
     def detect_workspace(self, override: Optional[str] = None) -> Path:
         """
@@ -85,9 +87,11 @@ class WorkspaceDetector:
             workspace = None
             
             # 1. Use override if provided
+            detection_method = None
             if override:
                 try:
                     workspace = self._sanitize_path(override)
+                    detection_method = "override_parameter"
                 except InvalidWorkspaceError:
                     # Log but continue to other strategies
                     pass
@@ -100,6 +104,7 @@ class WorkspaceDetector:
                     if workspace_paths:
                         # Use the first workspace folder
                         workspace = self._sanitize_path(workspace_paths[0].strip())
+                        detection_method = "WORKSPACE_FOLDER_PATHS"
                 except InvalidWorkspaceError:
                     # Log but continue
                     pass
@@ -108,6 +113,7 @@ class WorkspaceDetector:
             if not workspace and 'PROJECT_ROOT' in os.environ:
                 try:
                     workspace = self._sanitize_path(os.environ['PROJECT_ROOT'])
+                    detection_method = "PROJECT_ROOT"
                 except InvalidWorkspaceError:
                     # Log but continue
                     pass
@@ -116,6 +122,7 @@ class WorkspaceDetector:
             if not workspace:
                 try:
                     workspace = self._use_git_command(Path.cwd())
+                    detection_method = "git_rev_parse"
                 except (GitNotFoundError, InvalidWorkspaceError):
                     # Git command failed, will fall back to cwd
                     pass
@@ -124,6 +131,7 @@ class WorkspaceDetector:
             if not workspace:
                 try:
                     workspace = self._sanitize_path(str(Path.cwd()))
+                    detection_method = "cwd_fallback"
                 except InvalidWorkspaceError as e:
                     raise InvalidWorkspaceError(
                         f"Cannot determine workspace: current directory inaccessible: {e}"
@@ -137,6 +145,8 @@ class WorkspaceDetector:
             # Cache the result
             self._workspace = workspace
             self._initialized = True
+            self._detection_timestamp = time.time()
+            self._detection_method = detection_method
             
             return workspace
     
@@ -286,4 +296,20 @@ class WorkspaceDetector:
                 'entries': len(self._cache),
                 'total_hits': total_hits,
                 'ttl': self._cache_ttl,
+            }
+    
+    def get_workspace_info(self) -> Dict[str, any]:
+        """
+        Get detailed workspace detection information for diagnostics.
+        
+        Returns:
+            Dictionary with workspace detection details
+        """
+        with self._lock:
+            return {
+                'current_workspace': str(self._workspace) if self._workspace else None,
+                'initialized': self._initialized,
+                'detection_timestamp': self._detection_timestamp,
+                'detection_method': self._detection_method,
+                'time_since_detection': time.time() - self._detection_timestamp if self._detection_timestamp else None,
             }
