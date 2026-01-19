@@ -138,7 +138,7 @@ async def run_git_command(
         
             # Run command asynchronously
             result = await loop.run_in_executor(
-            None,
+                None,
                 lambda: subprocess.run(cmd, **kwargs)
             )
             
