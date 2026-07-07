@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/earlyprototype/fckgit/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/earlyprototype/fckgit/tests.yml?style=for-the-badge&label=tests" alt="Tests"/></a>
   <img src="https://img.shields.io/badge/commits-automatic-ff69b4?style=for-the-badge" alt="Automatic Commits"/>
   <img src="https://img.shields.io/badge/AI-powered-00d4ff?style=for-the-badge" alt="AI Powered"/>
   <img src="https://img.shields.io/badge/vibes-extreme-00ff00?style=for-the-badge" alt="Extreme Vibes"/>
