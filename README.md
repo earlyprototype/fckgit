@@ -15,6 +15,8 @@ Rapid-fire auto-commit with AI-generated messages using Gemini 2.5 Flash-Lite.
 
 Stop wasting time on git commits. **Prompt - Accept - Publish to Main.** 
 
+> Breaking character for one line: satire that ships. Underneath the joke is a real MCP server with a tested workspace-detection layer — see the [debugging case study](docs/workspace-detection.md). Okay, back to the vibes.
+
 ---
 ### 2026 Update: MCP server drop!
 fckgit now includes an MCP (Model Context Protocol) server so AI assistants can auto-commit your code directly.
