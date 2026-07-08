@@ -34,7 +34,7 @@ _AI to the core, with almost zero visibility._
 
 - 🤖 **AI Does Your Commits** - Gemini writes your commit messages so you have more time to focus on your Newsletter.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
-- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free teir maxxing.
+- ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free tier maxxing.
 - 🔧 **Handles Git's BS** - Mercifully cleans up lock files automatically.
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files for Product Managers.
 - 🌍 **Works Everywhere** - Windows, iPad, Linux
@@ -42,7 +42,7 @@ _AI to the core, with almost zero visibility._
 ## fckgit unlocks:
 - Up to 3x vibes 🏄‍♂️ 
 - Increased token spend at zero cost to you
-- FAANG adjaceny
+- FAANG adjacency
 - Founder mode
 - Growth Mindset
   
@@ -259,7 +259,7 @@ We auto-delete them. You're welcome.
 Don't do that/ask your AI to kill the extra processes with Task Manager.
 
 **Hit API rate limits?**  
-Free tier gives you 15/min. With a 30 second cooldown, you should still be tripping that 4/5 times a session. Switch acccount and grab new API key.
+Free tier gives you 15/min. With a 30 second cooldown, you should still be tripping that 4/5 times a session. Switch account and grab new API key.
 
 **Using this on a team repo?**  
 Stop that immediately. `--once` mode only permitted during hackathons.
