@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- MCP tools select one workspace per request. An explicit path resolves multi-root ambiguity.
+- Automatic commits report Git index lock contention and stop before pushing.
+- One-shot and watch commits include new files in the staged diff used for message generation.
+- CLI help, repository diagnostics and commits with a supplied message work without a Gemini key.
+
 ## [0.2.2] - 2026-01-06
 
 ### Added

@@ -12,7 +12,9 @@ pip install -e ".[mcp]"
 
 ### 2. Get Your API Key
 
-Get a free Gemini API key: https://makersuite.google.com/app/apikey
+Set `GEMINI_API_KEY` to generate commit messages. CLI help, `fckgit_status`,
+`fckgit_debug` and commits with a supplied message work without a key.
+[Get a Gemini API key](https://makersuite.google.com/app/apikey).
 
 ### 3. Configure (Choose Your IDE)
 
@@ -47,7 +49,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload Cursor: `Ctrl+Shift+P` → "Developer: Reload Window"
 
-**Done.** Switch projects in Cursor, fckgit follows automatically.
+When the client supplies a single MCP root, switching projects updates the target on the next call. With multiple roots, pass an absolute `workspace_path` to select the repository.
 
 ### VSCode (with MCP Extension)
 
@@ -72,7 +74,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload VSCode
 
-**Done.** Auto-detects your workspace like Cursor.
+Use `fckgit_status` to see the selected workspace.
 
 ### Claude Desktop
 
@@ -278,7 +280,7 @@ If you need to force a specific project path (e.g., for testing or unusual setup
 }
 ```
 
-Both methods override automatic detection. Restart Cursor after changing these settings.
+These settings supply a fallback when the client does not advertise roots. Restart the server after editing its launch configuration. To select a repository for one call, pass its absolute path in `workspace_path`.
 
 ### Debug Logging
 
@@ -320,11 +322,11 @@ For technical details about the implementation, see [mcp_server/README.md](mcp_s
 
 **Key Features:**
 
-1. **Automatic workspace detection**: Works out of the box in Cursor - just switch projects!
+1. **Workspace selection**: Each call uses its explicit workspace path, live client root, or configured fallback.
 2. **Security first**: Never uses `shell=True`, validates all inputs
 3. **Git-native detection**: Uses git commands to handle worktrees, submodules, etc.
 4. **Robust error handling**: Clear error messages for easy debugging
-5. **Performance**: Thread-safe caching with 60s TTL, <1ms cached lookups
+5. **Caching**: Git root lookups are scoped to the current request.
 6. **Cross-platform**: Windows, Mac, Linux support with platform-specific optimisations
 
 ## Examples

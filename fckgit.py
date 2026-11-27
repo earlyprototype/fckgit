@@ -12,11 +12,10 @@ if sys.platform == 'win32':
     except AttributeError:
         pass
 
-try:
-    from google import genai
-except ImportError:
-    print("❌ google-genai not installed. Run: pip install google-genai")
-    sys.exit(1)
+if __package__:
+    from .fckgit_gemini import GeminiConfigurationError, get_client
+else:
+    from fckgit_gemini import GeminiConfigurationError, get_client
 
 try:
     from watchdog.observers import Observer
@@ -24,33 +23,22 @@ try:
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
+    FileSystemEventHandler = object
 
-# Try to load .env file if python-dotenv is available
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # python-dotenv not installed, will use system env vars
-
-# Configure Gemini
-api_key = os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    print("❌ GEMINI_API_KEY environment variable not set.")
-    sys.exit(1)
-
-client = genai.Client(api_key=api_key)
+def stage_all_changes():
+    result = subprocess.run(["git", "add", "-A"], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if result.returncode:
+        raise RuntimeError(f"Failed to stage files: {result.stderr.strip()}")
 
 
-def get_diff():
-    """Get unstaged changes."""
-    result = subprocess.run(["git", "diff"], capture_output=True, text=True, encoding='utf-8', errors='replace')
-    return result.stdout if result.returncode == 0 else ""
-
-
-def get_staged_diff():
-    """Get staged changes."""
+def stage_and_get_diff():
+    """Check Gemini configuration before modifying the index."""
+    get_client()
+    stage_all_changes()
     result = subprocess.run(["git", "diff", "--cached"], capture_output=True, text=True, encoding='utf-8', errors='replace')
-    return result.stdout if result.returncode == 0 else ""
+    if result.returncode:
+        raise RuntimeError(f"Failed to read staged changes: {result.stderr.strip()}")
+    return result.stdout
 
 
 def generate_message(diff: str, faang_mode: bool = False) -> str:
@@ -73,6 +61,7 @@ Changes:
 
 Output ONLY the commit message, nothing else."""
     
+    client = get_client()
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -110,6 +99,7 @@ Output format:
 
 Output ONLY the commit message, nothing else."""
     
+    client = get_client()
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -121,23 +111,14 @@ Output ONLY the commit message, nothing else."""
         return f"refactor: Implement strategic codebase improvements\n\nEnhanced system architecture to improve maintainability and operational excellence. This change aligns with industry best practices and positions the codebase for future scalability."
 
 
-def cleanup_git_lock():
-    """Remove stale git lock file if it exists."""
-    lock_file = ".git/index.lock"
-    if os.path.exists(lock_file):
+def commit(message: str, stage_all: bool = True) -> bool:
+    """Stage all changes unless the caller has already prepared the index."""
+    if stage_all:
         try:
-            os.remove(lock_file)
-            print("🔧 Removed stale git lock file")
-        except Exception:
-            pass  # Ignore if we can't remove it
-
-
-def commit(message: str) -> bool:
-    """Stage all changes and commit."""
-    # Clean up any stale locks first
-    cleanup_git_lock()
-    
-    subprocess.run(["git", "add", "-A"], capture_output=True)
+            stage_all_changes()
+        except RuntimeError as exc:
+            print(f"❌ {exc}")
+            return False
     result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode == 0:
         # Get the commit hash
@@ -249,13 +230,6 @@ class GitChangeHandler(FileSystemEventHandler):
             # No changes in git, silently skip (likely temp files or already committed)
             return
         
-        # Double-check with diff
-        diff = get_staged_diff() or get_diff()
-        
-        if not diff.strip():
-            # No actual diff content, skip
-            return
-        
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         changed_files = [line.split()[-1] for line in status_result.stdout.strip().split('\n') if line.strip()]
         
@@ -268,10 +242,13 @@ class GitChangeHandler(FileSystemEventHandler):
             print("   Analyzing with AI...")
         
         try:
+            diff = stage_and_get_diff()
+            if not diff.strip():
+                return
             message = generate_message(diff, faang_mode=self.faang_mode)
             
             if message:
-                if commit(message):
+                if commit(message, stage_all=False):
                     push()
                 else:
                     # Commit failed - check if it's because nothing to commit
@@ -325,20 +302,17 @@ def watch_mode(faang_mode: bool = False, cooldown: int = 30):
         else:
             print("🔍 Found existing changes, committing before starting watch...")
         
-        # FIX: Stage files FIRST so untracked files appear in diff
-        subprocess.run(["git", "add", "-A"], capture_output=True)
-        
-        diff = get_staged_diff()
-        if diff.strip():
-            try:
+        try:
+            diff = stage_and_get_diff()
+            if diff.strip():
                 message = generate_message(diff, faang_mode=faang_mode)
                 if message:
-                    if commit(message):
+                    if commit(message, stage_all=False):
                         push()
                         print()
-            except Exception as e:
-                print(f"❌ Error committing existing changes: {e}")
-                print()
+        except Exception as e:
+            print(f"❌ Error committing existing changes: {e}")
+            print()
     
     event_handler = GitChangeHandler(faang_mode=faang_mode, cooldown=cooldown)
     observer = Observer()
@@ -385,8 +359,11 @@ def main():
     
     # Single commit mode
     if args.once:
-        # Get diff (prefer staged, fall back to unstaged)
-        diff = get_staged_diff() or get_diff()
+        try:
+            diff = stage_and_get_diff()
+        except RuntimeError as e:
+            print(f"❌ {e}")
+            sys.exit(1)
         
         if not diff.strip():
             print("No changes to commit.")
@@ -400,13 +377,18 @@ def main():
         message = generate_message(diff, faang_mode=args.faang)
         
         if message:
-            if commit(message):
+            if commit(message, stage_all=False):
                 push()
         else:
             print("❌ Failed to generate commit message.")
         return
     
     # Default: Watch mode
+    try:
+        get_client()
+    except GeminiConfigurationError as e:
+        print(f"❌ {e}")
+        sys.exit(1)
     watch_mode(faang_mode=args.faang, cooldown=args.cooldown)
 
 

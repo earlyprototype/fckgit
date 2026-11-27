@@ -17,19 +17,10 @@ The fckgit MCP server provides AI-powered git operations through the Model Conte
 - Security validation (path traversal, permissions)
 - Support for complex git configurations
 
-**Detection Strategy**:
-1. WORKSPACE_FOLDER_PATHS environment variable (automatic - provided by Cursor/VSCode)
-2. PROJECT_ROOT environment variable (manual override)
-3. Git command (`git rev-parse --show-toplevel`)
-4. Current working directory (fallback)
-
-**Why this approach?**
-
-**Auto-Detection for Modern IDEs:** Cursor and VSCode automatically provide the workspace path via the `WORKSPACE_FOLDER_PATHS` environment variable. This means the MCP server automatically works with the current project without any configuration!
-
-**Manual Configuration for Others:** For IDEs/clients that don't provide workspace info (Claude Desktop, JetBrains, Neovim, etc.), users set `cwd` in the MCP config, and the server uses `git rev-parse --show-toplevel` to find the actual git root.
-
-**Always Secure:** All paths are validated with security checks (path traversal, permissions, existence) before use.
+Each MCP request selects one directory. An explicit `workspace_path` takes
+precedence over live MCP client roots, followed by `WORKSPACE_FOLDER_PATHS`,
+`PROJECT_ROOT`, and the server's working directory. Multiple roots require an
+explicit selection. See [workspace detection](../docs/workspace-detection.md).
 
 ### 2. Git Utilities (`git_utils.py`)
 
@@ -138,19 +129,9 @@ async def run_git_command(
 
 ### Caching Strategy
 
-1. **Workspace Detection Cache**:
-   - TTL: 60 seconds (configurable)
-   - Thread-safe with RLock
-   - Tracks cache hits for monitoring
-
-2. **When to Invalidate**:
-   - After 60 seconds (TTL)
-   - On explicit errors (repo moved/deleted)
-   - Manual invalidation via `invalidate_cache()`
-
-3. **Cache Effectiveness**:
-   - First call: ~50ms (git command execution)
-   - Cached calls: <1ms (memory lookup)
+The detector caches Git root lookups by directory with a configurable TTL.
+Each request gets its own detector so a cached path from an earlier call
+cannot redirect a later operation.
 
 ### Git Command Optimization
 
@@ -223,20 +204,15 @@ def _sanitize_path(self, path: str) -> Path:
 
 ## Known Limitations
 
-1. **One workspace per MCP server instance**: Can't dynamically switch between projects
-   - **Workaround**: Configure multiple MCP server instances with different working directories
-
-2. **Requires git command available**: Won't work without git in PATH
-   - **Workaround**: Install git or set PATH appropriately
-
-3. **Cache may become stale**: If repository is moved/deleted while server running
-   - **Workaround**: Restart MCP server or invalidate cache
+A client that supplies a fixed process environment and working directory must
+send the active repository through MCP roots or `workspace_path` to switch
+projects during a session. Git must be available on PATH.
 
 ## Configuration
 
 ### Environment Variables
 
-- `PROJECT_ROOT`: Override workspace detection (highest priority)
+- `PROJECT_ROOT`: Select a directory when the client and WORKSPACE_FOLDER_PATHS supply no workspace
 - `GEMINI_API_KEY`: Required for AI commit messages
 - `LOG_LEVEL`: Set logging level (DEBUG, INFO, WARNING, ERROR)
 
@@ -289,11 +265,10 @@ def _sanitize_path(self, path: str) -> Path:
 
 ## Future Improvements
 
-1. **Dynamic workspace switching**: Accept workspace path in tool calls
-2. **Workspace metadata caching**: Cache more git metadata
-3. **Background refresh**: Refresh cache before expiry
-4. **Metrics collection**: Track performance and cache effectiveness
-5. **Custom git command timeout**: Per-command timeout configuration
+1. **Workspace metadata caching**: Cache more git metadata
+2. **Background refresh**: Refresh cache before expiry
+3. **Metrics collection**: Track performance and cache effectiveness
+4. **Custom git command timeout**: Per-command timeout configuration
 
 ## Contributing
 

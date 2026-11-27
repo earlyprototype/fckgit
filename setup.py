@@ -5,7 +5,7 @@ setup(
     version="0.2.1",
     description="Auto-commit with AI-generated messages using Gemini - Now with Silicon Valley Mode!",
     author="early_prototype",
-    py_modules=["fckgit"],
+    py_modules=["fckgit", "fckgit_gemini"],
     packages=find_packages(),
     install_requires=[
         "google-genai>=1.0.0",
@@ -13,7 +13,7 @@ setup(
         "watchdog>=2.0.0",
     ],
     extras_require={
-        "mcp": ["mcp>=1.0.0", "psutil>=5.9.0"],
+        "mcp": ["mcp>=1.0.0,<2", "psutil>=5.9.0"],
     },
     entry_points={
         "console_scripts": [
