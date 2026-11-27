@@ -29,7 +29,9 @@ import mcp.server.stdio
 
 # Import our new modules
 from .workspace import InvalidWorkspaceError, WorkspaceDetector
-from .git_utils import decode_git_path, detect_git_repo_type, git_environment, rev_parse
+from .git_utils import (
+    GitUtilsError, decode_git_path, detect_git_repo_type, discover_worktree, git_environment, rev_parse,
+)
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
 
@@ -363,8 +365,13 @@ def _is_watcher(executable: str, cmdline: list[str], cwd: Path) -> bool:
     if not re.fullmatch(r"pythonw?(?:\d+(?:\.\d+)*)?(?:\.exe)?", Path(executable).name, re.IGNORECASE):
         return False
     args = cmdline[1:]
-    while args and args[0] in ("-B", "-E", "-I", "-u"):
-        args = args[1:]
+    while args:
+        if re.fullmatch(r"-[BEIu]+", args[0]) or (args[0].startswith("-X") and len(args[0]) > 2):
+            args = args[1:]
+        elif args[0] == "-X" and len(args) > 1:
+            args = args[2:]
+        else:
+            break
     if args[:2] == ["-m", "fckgit"]:
         args = args[2:]
     elif args and (cwd / args[0]).resolve() in (_WATCH_SCRIPT, _CONSOLE_SCRIPT):
@@ -397,10 +404,10 @@ def find_fckgit_processes() -> list[tuple[psutil.Process, Path]]:
                 continue
             cwd = Path(info["cwd"])
             if _is_watcher(info["exe"], info["cmdline"], cwd):
-                root = rev_parse(cwd, "--show-toplevel")
-                if root.returncode == 0:
-                    processes.append((proc, Path(decode_git_path(root.stdout)).resolve()))
-        except (psutil.Error, OSError, RuntimeError, subprocess.SubprocessError):
+                root = discover_worktree(cwd)
+                if root is not None:
+                    processes.append((proc, root))
+        except (GitUtilsError, psutil.Error, OSError, RuntimeError, subprocess.SubprocessError):
             continue
     return processes
 
@@ -463,18 +470,9 @@ async def stop_watch_mode(repo_path: Path, pid: Optional[int] = None) -> tuple[b
 
 async def get_watch_status(repo_path: Path) -> tuple[bool, str]:
     """Check if fckgit watch is running in current repo."""
-    existing = find_fckgit_processes()
-    
-    for proc, root in existing:
+    for proc, root in find_fckgit_processes():
         if root == repo_path:
             return True, f"fckgit watch is running (PID: {proc.pid})"
-    
-    # Enhanced debugging info if not found
-    if existing:
-        debug_info = f"fckgit watch is not running in this repo.\n\nDetected repo: {repo_path}\n\nRunning fckgit processes:"
-        for proc, root in existing:
-            debug_info += f"\n  PID {proc.pid}: {root}"
-        return False, debug_info
     
     return False, "fckgit watch is not running"
 

@@ -3,6 +3,7 @@ Tests for git utilities module.
 """
 
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,42 @@ from mcp_server.git_utils import (
     detect_git_repo_type,
     check_git_available,
     get_git_version,
+    git_environment,
 )
+
+
+@pytest.mark.parametrize("source", ["numbered", "parameters"])
+def test_command_config_preserves_policy_and_discards_redirects(git_repo, monkeypatch, source):
+    settings = [
+        ("core.worktree", str(git_repo / "elsewhere")),
+        ("user.name", "O'Brien"),
+        ("commit.gpgSign", "true"),
+        ("push.default", "nothing"),
+        ("credential.helper", "example helper"),
+        ("credential.helper", ""),
+    ]
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    if source == "numbered":
+        monkeypatch.setenv("GIT_CONFIG_COUNT", str(len(settings)))
+        for i, (key, value) in enumerate(settings):
+            monkeypatch.setenv(f"GIT_CONFIG_KEY_{i}", key)
+            monkeypatch.setenv(f"GIT_CONFIG_VALUE_{i}", value)
+    else:
+        # Both Git encodings occur in the wild, including a literal apostrophe.
+        monkeypatch.setenv("GIT_CONFIG_PARAMETERS",
+                           r"'core.worktree=elsewhere' 'user.name'='O'\''Brien' "
+                           "'commit.gpgSign' 'push.default=nothing' "
+                           "'credential.helper'='example helper' 'credential.helper'=''")
+
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=git_repo, env=git_environment(), text=True)
+
+    assert Path(git("rev-parse", "--show-toplevel").rstrip("\n")) == git_repo
+    assert git("config", "--get", "user.name") == "O'Brien\n"
+    assert git("config", "--bool", "commit.gpgSign") == "true\n"
+    assert git("config", "--get", "push.default") == "nothing\n"
+    assert git("config", "--get-all", "credential.helper") == "example helper\n\n"
 
 
 class TestGitUtils:

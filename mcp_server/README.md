@@ -14,7 +14,7 @@ The fckgit MCP server provides AI-powered git operations through the Model Conte
 - Thread-safe workspace detection with locking
 - Directory-keyed cache for repeated Git root lookups within one detector
 - Multiple detection strategies with fallback
-- Security validation (path traversal, permissions)
+- Directory existence and access checks
 - Support for complex git configurations
 
 **Detection Strategy**:
@@ -30,7 +30,7 @@ Each call reads the workspace settings visible to the server. An editor that kee
 
 **Manual Configuration for Others:** For IDEs/clients that don't provide workspace info (Claude Desktop, JetBrains, Neovim, etc.), users set `cwd` in the MCP config, and the server uses `git rev-parse --show-toplevel` to find the actual git root.
 
-**Always Secure:** All paths are validated with security checks (path traversal, permissions, existence) before use.
+The detector resolves symlinks and checks that the selected path is an existing directory with read and search access. When Git reports a different worktree root, both locations must resolve to the same Git directory.
 
 ### 2. Git Utilities (`git_utils.py`)
 
@@ -46,6 +46,11 @@ Each call reads the workspace settings visible to the server. An editor that kee
 - `detect_git_repo_type()`: Comprehensive repository type detection
 - `check_git_available()`: Verify git command availability
 - `get_git_version()`: Get git version for debugging
+
+Git subprocesses discard inherited repository, worktree, and index selectors.
+The server filters command-level worktree redirects and config includes from
+`GIT_CONFIG_PARAMETERS` and numbered `GIT_CONFIG_COUNT` entries. Other entries
+retain their order, including signing, push, credential, and identity settings.
 
 ### 3. Platform Utilities (`platform_utils.py`)
 
@@ -83,7 +88,7 @@ Each call reads the workspace settings visible to the server. An editor that kee
 ```python
 async def run_git_command(
     cmd: list[str],
-    cwd: Optional[Path] = None,
+    cwd: Path,
     timeout: float = 15.0,
     retry: int = 1
 ) -> GitCommandResult
@@ -121,7 +126,7 @@ async def run_git_command(
 
 **Problem**: Multiple git repositories in directory tree. Which one to use?
 
-**Solution**: Prefer closest repository to current working directory.
+**Solution**: Discover the closest repository from the selected directory. Reject a `core.worktree` layout if starting Git from the reported root would select a different Git directory.
 
 ### Long Paths on Windows
 
@@ -157,18 +162,9 @@ life of the detector and supports a configurable TTL for repeated lookups.
 
 ### Path Validation
 
-```python
-def _sanitize_path(self, path: str) -> Path:
-    # 1. Resolve symlinks
-    resolved = Path(path).resolve(strict=False)
-    
-    # 2. Check for path traversal
-    if '..' in resolved.parts:
-        raise InvalidWorkspaceError("Path traversal detected")
-    
-    # 3. Validate exists and is directory
-    # 4. Check permissions (readable, executable)
-```
+Relative paths and symlinks resolve from the server's working directory.
+Clients can pass an absolute `repo_path` to identify a project independently
+of that directory.
 
 ### Command Injection Prevention
 

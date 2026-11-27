@@ -33,7 +33,10 @@ priority order:
 5. `Path.cwd()` fallback
 
 Git resolves a selected subdirectory to its worktree root. Each operation
-uses that path through completion, including any push retry. If the editor
+uses that path through completion, including any push retry. If moving
+to the root would select a different Git directory, the call returns an
+error before running the tool. This can happen when a nested repository
+sets `core.worktree` to its parent's worktree. If the editor
 keeps the server's original environment and working directory, pass the
 new project's absolute path as `repo_path`.
 
@@ -65,7 +68,7 @@ exposes `get_cache_stats()` / `invalidate_cache()`.
 
 | Option | Verdict |
 |--------|---------|
-| **A. Re-detect on every tool call** (short-TTL cache) | Recommended — simple, reliable, no client cooperation needed |
+| **A. Re-detect on every tool call** | Uses the settings visible to the server. Clients with a fixed environment and working directory pass the active project's `repo_path`. |
 | **B. Request roots from client** | Proper MCP, but client support is unverified |
 | **C. Hybrid** (roots on init, env fallback, per-call re-detect) | Best long-term, most complexity |
 

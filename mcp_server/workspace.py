@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict
 
-from .git_utils import decode_git_path, rev_parse
+from .git_utils import GitUtilsError, discover_worktree
 
 
 class WorkspaceError(Exception):
@@ -140,24 +140,20 @@ class WorkspaceDetector:
                 del self._cache[cache_key]
         
         try:
-            # Use git rev-parse to find repository root
-            # This works with worktrees, submodules, etc.
-            result = rev_parse(cwd, '--show-toplevel')
-            
-            if result.returncode == 0:
-                repo_root = decode_git_path(result.stdout)
-                if repo_root:
-                    sanitized = self._sanitize_path(repo_root)
-                    # Cache the result
-                    self._cache[cache_key] = CacheEntry(
-                        value=sanitized,
-                        timestamp=time.time(),
-                        hits=1
-                    )
-                    return sanitized
+            root = discover_worktree(cwd)
+            if root is not None:
+                sanitized = self._sanitize_path(str(root))
+                self._cache[cache_key] = CacheEntry(
+                    value=sanitized,
+                    timestamp=time.time(),
+                    hits=1
+                )
+                return sanitized
             
             return None
             
+        except GitUtilsError as e:
+            raise InvalidWorkspaceError(str(e)) from e
         except FileNotFoundError:
             raise GitNotFoundError("git command not found in PATH")
         except subprocess.TimeoutExpired:

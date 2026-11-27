@@ -151,6 +151,44 @@ async def test_commit_respects_discovery_ceiling(git_repo):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("shared_root", [False, True], ids=["child-worktree", "parent-worktree"])
+async def test_stdio_commit_preserves_parent_with_core_worktree(git_repo, shared_root):
+    child = git_repo / "child"
+    git_output(git_repo, "init", str(child))
+    git_output(child, "config", "user.name", "Test User")
+    git_output(child, "config", "user.email", "test@example.com")
+    git_output(child, "commit", "--allow-empty", "-m", "Child baseline")
+    checkout = child / "checkout"
+    checkout.mkdir()
+    (checkout / "change.txt").write_text("child change")
+    worktree = git_repo if shared_root else checkout
+    git_output(child, "config", "core.worktree", str(worktree))
+    readme = git_repo / "README.md"
+    readme.write_text("staged parent edit")
+    git_output(git_repo, "add", "README.md")
+    readme.write_text("unstaged parent edit")
+    index = git_repo / ".git" / "index"
+    index_before = index.read_bytes()
+    head_before = git_output(git_repo, "rev-parse", "HEAD")
+    assert Path(git_output(child, "rev-parse", "--show-toplevel")) == worktree
+    assert Path(git_output(child, "rev-parse", "--absolute-git-dir")) == child / ".git"
+
+    async with mcp_client(git_repo) as session:
+        result = await session.call_tool(
+            "fckgit_commit_with_message", {"repo_path": str(child), "message": "Child change"}
+        )
+    assert git_output(git_repo, "rev-parse", "HEAD") == head_before
+    assert index.read_bytes() == index_before
+    assert readme.read_text() == "unstaged parent edit"
+    if shared_root:
+        assert result.isError and "Git directory" in result.content[0].text
+        assert git_output(child, "log", "-1", "--format=%s") == "Child baseline"
+    else:
+        assert not result.isError and "Committed successfully" in result.content[0].text
+        assert git_output(child, "ls-tree", "--name-only", "HEAD") == "change.txt"
+
+
+@pytest.mark.asyncio
 async def test_stdio_preserves_git_root_spelling(projects):
     first, second = projects
     # POSIX also allows whitespace at the end of a directory name.
@@ -295,11 +333,12 @@ def test_watcher_commit_preserves_active_lock(git_repo):
 
 
 @pytest.mark.asyncio
-async def test_live_module_watcher_lifecycle(git_repo, tmp_path):
+@pytest.mark.parametrize("options", [["-B"], ["-X", "utf8", "-u"], ["-Bu"]])
+async def test_live_module_watcher_lifecycle(git_repo, tmp_path, options):
     log = tmp_path / "watch.log"
     with log.open("wb") as output:
         watcher = subprocess.Popen(
-            [sys.executable, "-B", "-m", "fckgit"], cwd=git_repo,
+            [sys.executable, *options, "-m", "fckgit"], cwd=git_repo,
             env={**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"},
             stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
         )
@@ -313,6 +352,11 @@ async def test_live_module_watcher_lifecycle(git_repo, tmp_path):
         assert "is running (PID:" in status, status
         pid = int(status.split("PID: ")[1].split(")")[0])
         assert f"already running (PID: {pid})" in await call("fckgit_blastoff", args)
+        other_repo = tmp_path / "other"
+        git_output(tmp_path, "init", str(other_repo))
+        other_status = await call("fckgit_watch_status", {"repo_path": str(other_repo)})
+        assert "is not running" in other_status
+        assert str(git_repo) not in other_status and str(pid) not in other_status
         assert "Stopped" in await call("fckgit_stop_watch", {**args, "pid": pid})
         watcher.wait(timeout=5)
         assert "is not running" in await call("fckgit_watch_status", args)
