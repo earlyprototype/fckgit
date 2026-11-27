@@ -1,7 +1,9 @@
 import asyncio
 import os
+import re
 import subprocess
 import sys
+import sysconfig
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,8 +28,8 @@ from mcp.server import NotificationOptions, Server
 import mcp.server.stdio
 
 # Import our new modules
-from .workspace import WorkspaceDetector, WorkspaceError
-from .git_utils import detect_git_repo_type
+from .workspace import InvalidWorkspaceError, WorkspaceDetector, WorkspaceError
+from .git_utils import detect_git_repo_type, git_environment, rev_parse
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
 
@@ -48,6 +50,8 @@ server = Server("fckgit")
 
 # Track running watch processes
 _watch_processes: dict[Path, subprocess.Popen] = {}
+_WATCH_SCRIPT = Path(__file__).resolve().parent.parent / "fckgit.py"
+_CONSOLE_SCRIPT = Path(sysconfig.get_path("scripts")) / ("fckgit.exe" if os.name == "nt" else "fckgit")
 
 
 @dataclass
@@ -99,6 +103,7 @@ async def run_git_command(
     # Get platform-specific subprocess kwargs
     kwargs = get_subprocess_kwargs(is_background=False, timeout=timeout)
     kwargs['cwd'] = str(cwd)
+    kwargs['env'] = git_environment()
     
     # Log command execution (without sensitive data)
     cmd_str = ' '.join(cmd)
@@ -300,14 +305,16 @@ async def cleanup_git_lock(cwd: Path) -> bool:
     return False
 
 
+async def stage_changes(cwd: Path) -> None:
+    result = await run_git_command(["git", "add", "-A"], cwd)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to stage files: {result.stderr.strip()}")
+
+
 async def commit_changes(cwd: Path, message: str, stage_all: bool = True) -> tuple[bool, str]:
     """Stage all changes and commit."""
-    await cleanup_git_lock(cwd)
-    
     if stage_all:
-        result = await run_git_command(["git", "add", "-A"], cwd)
-        if result.returncode != 0:
-            return False, "Failed to stage files"
+        await stage_changes(cwd)
     
     result = await run_git_command(["git", "commit", "-m", message], cwd)
     
@@ -320,7 +327,7 @@ async def commit_changes(cwd: Path, message: str, stage_all: bool = True) -> tup
         error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
         if "nothing to commit" in error_msg.lower():
             return False, "Nothing to commit"
-        return False, f"Commit failed: {error_msg}"
+        raise RuntimeError(f"Commit failed: {error_msg}")
 
 
 async def push_to_remote(cwd: Path) -> tuple[bool, str]:
@@ -348,70 +355,75 @@ async def push_to_remote(cwd: Path) -> tuple[bool, str]:
     return False, f"Push failed: {error_msg}"
 
 
-def find_fckgit_processes() -> list[dict[str, Any]]:
-    """Find running fckgit watch processes."""
+def _is_watcher(executable: str, cmdline: list[str], cwd: Path) -> bool:
+    if not re.fullmatch(r"pythonw?(?:\d+(?:\.\d+)*)?(?:\.exe)?", Path(executable).name, re.IGNORECASE):
+        return False
+    args = cmdline[1:]
+    while args and args[0] in ("-E", "-I", "-u"):
+        args = args[1:]
+    if args[:2] == ["-m", "fckgit"]:
+        args = args[2:]
+    elif args and (cwd / args[0]).resolve() in (_WATCH_SCRIPT, _CONSOLE_SCRIPT):
+        args = args[1:]
+    else:
+        return False
+
+    while args:
+        option = args.pop(0)
+        if option == "--faang":
+            continue
+        if option == "--cooldown" and args:
+            value = args.pop(0)
+        elif option.startswith("--cooldown="):
+            value = option.partition("=")[2]
+        else:
+            return False
+        if not re.fullmatch(r"[+-]?\d+", value):
+            return False
+    return True
+
+
+def find_fckgit_processes() -> list[tuple[psutil.Process, Path]]:
+    """Pair each watcher with its Git worktree, keeping the verified process handle."""
     processes = []
-    try:
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cwd']):
-            try:
-                cmdline = proc.info['cmdline'] or []
-                cmdline_str = ' '.join(cmdline)
-                
-                # Look for python -m fckgit or fckgit without --once
-                if ('python' in cmdline_str.lower() and 
-                    'fckgit' in cmdline_str and 
-                    '--once' not in cmdline_str):
-                    processes.append({
-                        'pid': proc.info['pid'],
-                        'cmdline': cmdline_str,
-                        'cwd': proc.info.get('cwd', 'unknown')
-                    })
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+    for proc in psutil.process_iter(["exe", "cmdline", "cwd"]):
+        try:
+            info = proc.info
+            if not info["exe"] or not info["cmdline"] or not info["cwd"]:
                 continue
-    except Exception:
-        pass
+            cwd = Path(info["cwd"])
+            if _is_watcher(info["exe"], info["cmdline"], cwd):
+                root = rev_parse(cwd, "--show-toplevel")
+                if root.returncode == 0:
+                    processes.append((proc, Path(root.stdout.strip()).resolve()))
+        except (psutil.Error, OSError, RuntimeError, subprocess.SubprocessError):
+            continue
     return processes
 
 
 async def start_watch_mode(repo_path: Path, cooldown: int = 30, faang_mode: bool = False) -> tuple[bool, str, Optional[int]]:
     """Start fckgit in watch mode as a background process."""
     
-    # Check if already running in this repo
-    # Normalize paths for comparison (handles Windows forward/backslash differences)
-    repo_path_normalized = str(Path(repo_path).resolve())
-    existing = find_fckgit_processes()
-    for proc in existing:
-        proc_cwd_normalized = str(Path(proc['cwd']).resolve()) if proc['cwd'] != 'unknown' else 'unknown'
-        if proc_cwd_normalized == repo_path_normalized:
-            return False, f"fckgit watch already running (PID: {proc['pid']})", proc['pid']
+    for proc, root in find_fckgit_processes():
+        if root == repo_path:
+            return False, f"fckgit watch already running (PID: {proc.pid})", proc.pid
     
     # Build command with cooldown and faang mode
-    cmd = [sys.executable, "-m", "fckgit", "--cooldown", str(cooldown)]
+    # Start the installed CLI by filename. -E excludes the caller's PYTHONPATH.
+    cmd = [sys.executable, "-E", str(_WATCH_SCRIPT), "--cooldown", str(cooldown)]
     if faang_mode:
         cmd.append("--faang")
     
-    # Start the process
     try:
-        # Use CREATE_NEW_PROCESS_GROUP on Windows or start_new_session on Unix
         if sys.platform == 'win32':
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-            process = subprocess.Popen(
-                cmd,
-                cwd=repo_path,
-                creationflags=creationflags,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL
-            )
+            launch_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW}
         else:
-            process = subprocess.Popen(
-                cmd,
-                cwd=repo_path,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL
-            )
+            launch_options = {"start_new_session": True}
+        process = subprocess.Popen(
+            cmd, cwd=repo_path, env=git_environment(),
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            **launch_options,
+        )
         
         # Store the process
         _watch_processes[repo_path] = process
@@ -424,24 +436,18 @@ async def start_watch_mode(repo_path: Path, cooldown: int = 30, faang_mode: bool
 async def stop_watch_mode(repo_path: Path, pid: Optional[int] = None) -> tuple[bool, str]:
     """Stop a running fckgit watch process."""
     
-    # Normalize paths for comparison (handles Windows forward/backslash differences)
-    repo_path_normalized = str(Path(repo_path).resolve())
-    existing = find_fckgit_processes()
-    for proc_info in existing:
-        if pid is not None and proc_info['pid'] != pid:
+    for proc, root in find_fckgit_processes():
+        if root != repo_path or (pid is not None and proc.pid != pid):
             continue
-        proc_cwd_normalized = str(Path(proc_info['cwd']).resolve()) if proc_info['cwd'] != 'unknown' else 'unknown'
-        if proc_cwd_normalized == repo_path_normalized:
+        try:
+            proc.terminate()
             try:
-                proc = psutil.Process(proc_info['pid'])
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except psutil.TimeoutExpired:
-                    proc.kill()
-                return True, f"Stopped fckgit watch process (PID: {proc_info['pid']})"
-            except Exception as e:
-                return False, f"Failed to stop process: {str(e)}"
+                proc.wait(timeout=5)
+            except psutil.TimeoutExpired:
+                proc.kill()
+            return True, f"Stopped fckgit watch process (PID: {proc.pid})"
+        except psutil.Error as e:
+            return False, f"Failed to stop process: {e}"
     
     return False, "No fckgit watch process found for this repository"
 
@@ -450,20 +456,15 @@ async def get_watch_status(repo_path: Path) -> tuple[bool, str]:
     """Check if fckgit watch is running in current repo."""
     existing = find_fckgit_processes()
     
-    # Normalize paths for comparison (handles Windows forward/backslash differences)
-    repo_path_normalized = str(Path(repo_path).resolve())
-    
-    for proc in existing:
-        proc_cwd_normalized = str(Path(proc['cwd']).resolve()) if proc['cwd'] != 'unknown' else 'unknown'
-        if proc_cwd_normalized == repo_path_normalized:
-            return True, f"fckgit watch is running (PID: {proc['pid']})"
+    for proc, root in existing:
+        if root == repo_path:
+            return True, f"fckgit watch is running (PID: {proc.pid})"
     
     # Enhanced debugging info if not found
     if existing:
-        debug_info = f"fckgit watch is not running in this repo.\n\nDetected repo: {repo_path_normalized}\n\nRunning fckgit processes:"
-        for proc in existing:
-            proc_cwd_normalized = str(Path(proc['cwd']).resolve()) if proc['cwd'] != 'unknown' else 'unknown'
-            debug_info += f"\n  PID {proc['pid']}: {proc_cwd_normalized}"
+        debug_info = f"fckgit watch is not running in this repo.\n\nDetected repo: {repo_path}\n\nRunning fckgit processes:"
+        for proc, root in existing:
+            debug_info += f"\n  PID {proc.pid}: {root}"
         return False, debug_info
     
     return False, "fckgit watch is not running"
@@ -663,11 +664,8 @@ async def handle_call_tool(
     detector = WorkspaceDetector()
     repo_path = arguments.get("repo_path")
     if "repo_path" in arguments and not isinstance(repo_path, str):
-        return [types.TextContent(type="text", text="Error: repo_path must be a directory path")]
-    try:
-        cwd = await asyncio.to_thread(detector.detect_workspace, override=repo_path)
-    except (WorkspaceError, OSError) as e:
-        return [types.TextContent(type="text", text=f"Error: {e}")]
+        raise InvalidWorkspaceError("repo_path must be a directory path")
+    cwd = await asyncio.to_thread(detector.detect_workspace, override=repo_path)
 
     # Debug tool doesn't require git repo
     if name == "fckgit_debug":
@@ -760,10 +758,7 @@ async def handle_call_tool(
     # Check if in git repo (skip for debug tool)
     result = await run_git_command(["git", "rev-parse", "--git-dir"], cwd)
     if result.returncode != 0:
-        return [types.TextContent(
-            type="text",
-            text="Error: Not a git repository"
-        )]
+        raise InvalidWorkspaceError(f"Cannot open Git repository at {cwd}: {result.stderr.strip()}")
     
     if name == "fckgit_status":
         include_diff = arguments.get("include_diff", False)
@@ -807,7 +802,7 @@ async def handle_call_tool(
         # Get diff for message generation
         if stage_all:
             # Stage first so we can see untracked files
-            await run_git_command(["git", "add", "-A"], cwd)
+            await stage_changes(cwd)
         
         staged = await get_staged_diff(cwd)
         unstaged = await get_diff(cwd)
@@ -897,7 +892,7 @@ async def handle_call_tool(
         # Get diff for message generation
         if stage_all:
             # Stage first so we can see untracked files
-            await run_git_command(["git", "add", "-A"], cwd)
+            await stage_changes(cwd)
         
         staged = await get_staged_diff(cwd)
         unstaged = await get_diff(cwd)

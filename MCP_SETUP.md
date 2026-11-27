@@ -16,7 +16,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 ### 3. Configure (Choose Your IDE)
 
-**Using Cursor or VSCode?** → Skip to [Cursor/VSCode Setup](#cursor-ide-automatic-detection)  
+**Using Cursor or VSCode?** → Skip to [Cursor/VSCode Setup](#cursor-ide)
 **Using Claude Desktop?** → Skip to [Claude Desktop Setup](#claude-desktop)  
 **Using something else?** → Skip to [Other IDEs Setup](#other-ides--mcp-clients)
 
@@ -24,9 +24,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 ## Configuration by IDE
 
-### Cursor IDE (Automatic Detection)
-
-**Zero configuration. Just add your API key.**
+### Cursor IDE
 
 1. Open Cursor Settings: `File > Preferences > Cursor Settings > MCP`
 2. Add this config:
@@ -47,11 +45,14 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload Cursor: `Ctrl+Shift+P` → "Developer: Reload Window"
 
-**Done.** Switch projects in Cursor, fckgit follows automatically.
+When Cursor keeps the same MCP server after a project switch, pass the new
+project's absolute path as `repo_path` on each tool call. The server uses
+its own environment and working directory when you omit the argument.
+Before committing, call `fckgit_debug` with `{"repo_path": "/projects/my-app"}`
+and check that `git_root` matches your intended worktree. Pass that same
+`repo_path` to the commit tool.
 
 ### VSCode (with MCP Extension)
-
-**Same as Cursor - zero configuration.**
 
 1. Install an MCP extension for VSCode (if available)
 2. Add this to your MCP config:
@@ -72,7 +73,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload VSCode
 
-**Done.** Auto-detects your workspace like Cursor.
+After switching projects, use the same `repo_path` and `git_root` check as in Cursor.
 
 ### Claude Desktop
 
@@ -184,8 +185,8 @@ Tell your AI assistant:
 ## Testing
 
 1. Restart your AI assistant (Cursor/Claude Desktop)
-2. In a git repository, ask: "What's the git status?"
-3. If it works, you're good to go
+2. Call `fckgit_debug` with the intended repository's absolute `repo_path`.
+3. Check `git_root`, then call `fckgit_status` with the same path to see the changed files.
 
 ## Troubleshooting
 
@@ -198,10 +199,16 @@ Tell your AI assistant:
 
 ### Problem: "Wrong repository detected"
 
-**Solution:**
-- **Cursor/VSCode:** Switch to the correct project in the IDE
-- **Claude Desktop:** Fix the `cwd` path in your config file
-- Ask your AI: "run fckgit_debug" to see what path was detected
+Call `fckgit_debug` with the arguments you plan to use for the commit.
+Inspect `git_root` and `detection_method`. If the root is wrong or missing,
+pass the intended repository's absolute `repo_path` to both the debug call
+and the commit. An explicit path applies only to that call.
+
+For calls without `repo_path`, the first folder in `WORKSPACE_FOLDER_PATHS`
+takes precedence over `PROJECT_ROOT`. An inaccessible configured folder
+produces a tool error. Correct the setting and restart the server to load
+it. With both settings absent, the server discovers Git from its working
+directory.
 
 ### Problem: "GEMINI_API_KEY not set"
 

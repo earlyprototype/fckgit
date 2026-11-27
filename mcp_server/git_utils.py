@@ -8,10 +8,35 @@ Provides support for:
 - Nested repositories
 """
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+
+# Repository-local variables listed by git rev-parse --local-env-vars, plus
+# settings that redirect discovery, refs, or objects for a receiving repo.
+_REPO_ENV = {
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CEILING_DIRECTORIES", "GIT_COMMON_DIR",
+    "GIT_CONFIG", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_DIR",
+    "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_GRAFT_FILE", "GIT_IMPLICIT_WORK_TREE",
+    "GIT_INDEX_FILE", "GIT_NAMESPACE", "GIT_NO_REPLACE_OBJECTS", "GIT_OBJECT_DIRECTORY",
+    "GIT_PREFIX", "GIT_QUARANTINE_PATH", "GIT_REPLACE_REF_BASE", "GIT_SHALLOW_FILE",
+    "GIT_WORK_TREE",
+}
+
+
+def git_environment() -> dict[str, str]:
+    """Let Git discover the target from cwd, preserving user identity and credentials."""
+    return {key: value for key, value in os.environ.items() if key not in _REPO_ENV}
+
+
+def rev_parse(path: Path, flag: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "rev-parse", flag], cwd=path, env=git_environment(),
+        capture_output=True, text=True, timeout=5.0, stdin=subprocess.DEVNULL,
+    )
 
 
 @dataclass
@@ -48,14 +73,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
     """
     try:
         # Get repository root
-        result = subprocess.run(
-            ['git', 'rev-parse', '--show-toplevel'],
-            cwd=str(path),
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            stdin=subprocess.DEVNULL,
-        )
+        result = rev_parse(path, '--show-toplevel')
         
         if result.returncode != 0:
             return None
@@ -63,14 +81,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
         root = Path(result.stdout.strip())
         
         # Get git directory
-        result = subprocess.run(
-            ['git', 'rev-parse', '--git-dir'],
-            cwd=str(path),
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            stdin=subprocess.DEVNULL,
-        )
+        result = rev_parse(path, '--git-dir')
         
         if result.returncode != 0:
             return None
@@ -120,14 +131,7 @@ def _is_worktree(path: Path) -> bool:
         True if path is in a worktree
     """
     try:
-        result = subprocess.run(
-            ['git', 'rev-parse', '--git-common-dir'],
-            cwd=str(path),
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            stdin=subprocess.DEVNULL,
-        )
+        result = rev_parse(path, '--git-common-dir')
         
         if result.returncode != 0:
             return False
@@ -136,14 +140,7 @@ def _is_worktree(path: Path) -> bool:
         
         # In a worktree, --git-common-dir points to the main repo's .git dir
         # In a regular repo, it points to .git (same as --git-dir)
-        result2 = subprocess.run(
-            ['git', 'rev-parse', '--git-dir'],
-            cwd=str(path),
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            stdin=subprocess.DEVNULL,
-        )
+        result2 = rev_parse(path, '--git-dir')
         
         if result2.returncode != 0:
             return False
@@ -168,14 +165,7 @@ def _is_submodule(path: Path) -> bool:
         True if path is in a submodule
     """
     try:
-        result = subprocess.run(
-            ['git', 'rev-parse', '--show-superproject-working-tree'],
-            cwd=str(path),
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            stdin=subprocess.DEVNULL,
-        )
+        result = rev_parse(path, '--show-superproject-working-tree')
         
         # If there's a superproject, this is a submodule
         return result.returncode == 0 and bool(result.stdout.strip())
@@ -197,14 +187,7 @@ def _is_bare_repository(path: Path) -> bool:
         True if path is a bare repository
     """
     try:
-        result = subprocess.run(
-            ['git', 'rev-parse', '--is-bare-repository'],
-            cwd=str(path),
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            stdin=subprocess.DEVNULL,
-        )
+        result = rev_parse(path, '--is-bare-repository')
         
         return result.returncode == 0 and result.stdout.strip() == 'true'
         
@@ -223,14 +206,7 @@ def _get_superproject_root(path: Path) -> Optional[Path]:
         Path to superproject root, or None if not in submodule
     """
     try:
-        result = subprocess.run(
-            ['git', 'rev-parse', '--show-superproject-working-tree'],
-            cwd=str(path),
-            capture_output=True,
-            text=True,
-            timeout=5.0,
-            stdin=subprocess.DEVNULL,
-        )
+        result = rev_parse(path, '--show-superproject-working-tree')
         
         if result.returncode == 0 and result.stdout.strip():
             return Path(result.stdout.strip())

@@ -35,7 +35,7 @@ _AI to the core, with almost zero visibility._
 - 🤖 **AI Does Your Commits** - Gemini writes your commit messages so you have more time to focus on your Newsletter.
 - 👀 **Auto-Everything** - Watches files, commits, pushes. You literally don't know whats going on.
 - ⚡ **Fast & Cheap** - Uses the cheapest Gemini model. Free tier maxxing.
-- 🔧 **Handles Git's BS** - Mercifully cleans up lock files automatically.
+- 🔧 **Git lock errors** - Reports when a lock blocks a commit.
 - 📝 **Actually Shows Useful Info** - Timestamps, hashes, files for Product Managers.
 - 🌍 **Works Everywhere** - Windows, iPad, Linux
 
@@ -98,7 +98,7 @@ pip install -e ".[mcp]"
 
 **If you use Cursor or VSCode:**
 
-Add this to your MCP config. That's it. Auto-detects your project.
+Add this to your MCP config. If the same server stays running after a project switch, pass the new project's absolute `repo_path` on each call.
 
 ```json
 {
@@ -253,7 +253,7 @@ File changes → AI reads diff → Main
 Windows moment. Just hit 'y' for victory.
 
 **Git lock file errors during commits?**  
-We auto-delete them. You're welcome.
+Let any active Git operation finish, then retry. If a lock remains after Git has exited, verify the worktree with `fckgit_debug` before using `fckgit_cleanup_lock` with the same `repo_path`.
 
 **Multiple fckgit instances running?**  
 Don't do that/ask your AI to kill the extra processes with Task Manager.
