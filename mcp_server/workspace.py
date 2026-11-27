@@ -14,7 +14,9 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict
+
+from .git_utils import workspace_git_env
 
 
 class WorkspaceError(Exception):
@@ -44,10 +46,7 @@ class WorkspaceDetector:
     """
     Thread-safe workspace detector with caching.
     
-    Detects workspace using multiple strategies:
-    1. PROJECT_ROOT environment variable (manual override)
-    2. Git command (git rev-parse --show-toplevel)
-    3. Current working directory fallback
+    Checks the request override, editor workspace, project root and cwd in order.
     """
     
     def __init__(self, cache_ttl: int = 60):
@@ -79,46 +78,22 @@ class WorkspaceDetector:
             InvalidWorkspaceError: If workspace cannot be determined
         """
         with self._lock:
-            # Return cached workspace if already initialized and no override
-            if self._initialized and self._workspace and not override:
-                return self._workspace
-            
-            # Try detection strategies in order
             workspace = None
-            
-            # 1. Use override if provided
             detection_method = None
-            if override:
-                try:
-                    workspace = self._sanitize_path(override)
-                    detection_method = "override_parameter"
-                except InvalidWorkspaceError:
-                    # Log but continue to other strategies
-                    pass
+            if override is not None:
+                workspace = self._sanitize_path(override)
+                detection_method = "override_parameter"
+            elif 'WORKSPACE_FOLDER_PATHS' in os.environ:
+                folders = [p.strip() for p in os.environ['WORKSPACE_FOLDER_PATHS'].split(';') if p.strip()]
+                if len(folders) != 1:
+                    raise InvalidWorkspaceError("Ambiguous workspace. Supply one workspace_path.")
+                workspace = self._sanitize_path(folders[0])
+                detection_method = "WORKSPACE_FOLDER_PATHS"
+            elif 'PROJECT_ROOT' in os.environ:
+                workspace = self._sanitize_path(os.environ['PROJECT_ROOT'])
+                detection_method = "PROJECT_ROOT"
             
-            # 2. Check WORKSPACE_FOLDER_PATHS from Cursor/VSCode
-            if not workspace and 'WORKSPACE_FOLDER_PATHS' in os.environ:
-                try:
-                    # Can be semicolon-separated for multiple folders
-                    workspace_paths = os.environ['WORKSPACE_FOLDER_PATHS'].split(';')
-                    if workspace_paths:
-                        # Use the first workspace folder
-                        workspace = self._sanitize_path(workspace_paths[0].strip())
-                        detection_method = "WORKSPACE_FOLDER_PATHS"
-                except InvalidWorkspaceError:
-                    # Log but continue
-                    pass
-            
-            # 3. Check PROJECT_ROOT environment variable (manual override)
-            if not workspace and 'PROJECT_ROOT' in os.environ:
-                try:
-                    workspace = self._sanitize_path(os.environ['PROJECT_ROOT'])
-                    detection_method = "PROJECT_ROOT"
-                except InvalidWorkspaceError:
-                    # Log but continue
-                    pass
-            
-            # 4. Use git command to find repository root
+            # With no configured target, use the repository containing cwd.
             if not workspace:
                 try:
                     workspace = self._use_git_command(Path.cwd())
@@ -127,7 +102,7 @@ class WorkspaceDetector:
                     # Git command failed, will fall back to cwd
                     pass
             
-            # 5. Fallback to current working directory
+            # Diagnostics also work outside a repository.
             if not workspace:
                 try:
                     workspace = self._sanitize_path(str(Path.cwd()))
@@ -136,11 +111,6 @@ class WorkspaceDetector:
                     raise InvalidWorkspaceError(
                         f"Cannot determine workspace: current directory inaccessible: {e}"
                     )
-            
-            # Validate it's a git repository (optional, log warning if not)
-            if not self._validate_git_repo(workspace):
-                # Not a git repo, but we'll allow it (user might init later)
-                pass
             
             # Cache the result
             self._workspace = workspace
@@ -185,6 +155,7 @@ class WorkspaceDetector:
             result = subprocess.run(
                 ['git', 'rev-parse', '--show-toplevel'],
                 cwd=str(cwd),
+                env=workspace_git_env(),
                 capture_output=True,
                 text=True,
                 timeout=5.0,
@@ -227,6 +198,7 @@ class WorkspaceDetector:
             result = subprocess.run(
                 ['git', 'rev-parse', '--git-dir'],
                 cwd=str(path),
+                env=workspace_git_env(),
                 capture_output=True,
                 text=True,
                 timeout=5.0,
@@ -249,6 +221,8 @@ class WorkspaceDetector:
         Raises:
             InvalidWorkspaceError: If path is invalid or insecure
         """
+        if not isinstance(path, str) or not path.strip():
+            raise InvalidWorkspaceError("A workspace path is required.")
         try:
             # Resolve the path (handles symlinks, relative paths)
             resolved = Path(path).resolve(strict=False)

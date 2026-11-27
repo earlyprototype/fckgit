@@ -8,10 +8,68 @@ Provides support for:
 - Nested repositories
 """
 
+import os
+import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+
+# Git's rev-parse --local-env-vars, plus the namespace and quarantine overrides.
+_REPOSITORY_ENV = {
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_CONFIG",
+    "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_DIR", "GIT_GRAFT_FILE",
+    "GIT_IMPLICIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX",
+    "GIT_QUARANTINE_PATH", "GIT_REPLACE_REF_BASE", "GIT_SHALLOW_FILE", "GIT_WORK_TREE",
+}
+
+
+def workspace_git_env(operation=None):
+    """Let Git discover the requested repository from the child's cwd."""
+    env = {
+        name: value for name, value in os.environ.items()
+        if name not in _REPOSITORY_ENV and not name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))
+    }
+    # Git passes -c options to child processes in GIT_CONFIG_PARAMETERS.
+    # Numbered environment options precede them in Git's precedence order.
+    settings = []
+    for i in range(int(os.environ.get("GIT_CONFIG_COUNT") or 0)):
+        settings.append((os.environ[f"GIT_CONFIG_KEY_{i}"], os.environ[f"GIT_CONFIG_VALUE_{i}"]))
+    for option in shlex.split(os.environ.get("GIT_CONFIG_PARAMETERS", "")):
+        key, equals, value = option.partition("=")
+        settings.append((key, value if equals else "true"))
+
+    count = 0
+    for key, value in settings:
+        name = key.lower()
+        if name in {"core.worktree", "core.bare", "core.fsmonitor", "core.alternaterefscommand",
+                    "core.repositoryformatversion", "diff.external"} or name.startswith(("filter.", "extensions.")):
+            continue
+        # Branch tracking and remote.pushDefault select a remote in the current worktree.
+        if name.startswith("branch.") and not name.endswith((".remote", ".pushremote", ".merge")):
+            continue
+        include = name.startswith(("include.", "includeif."))
+        filtered_transport = name != "remote.pushdefault" and (
+            name.startswith(("remote.", "url.", "submodule.")) or name in {"core.sshcommand", "core.gitproxy"}
+        )
+        if include or filtered_transport:
+            if operation in {"push", "pull"}:
+                raise GitUtilsError("Cannot push with inherited Git transport or include overrides. "
+                                    "Configure the destination in the selected repository.")
+            if include and operation == "commit":
+                raise GitUtilsError("Cannot resolve commit hooks from an inherited Git config include.")
+            continue
+        # Keep transport restrictions when removing inherited transport overrides.
+        if name.startswith("protocol.") and not (name.endswith(".allow") and value.lower() in {"never", "user"}):
+            continue
+        env[f"GIT_CONFIG_KEY_{count}"] = key
+        env[f"GIT_CONFIG_VALUE_{count}"] = value
+        count += 1
+    if count:
+        env["GIT_CONFIG_COUNT"] = str(count)
+    return env
 
 
 @dataclass
@@ -51,6 +109,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
         result = subprocess.run(
             ['git', 'rev-parse', '--show-toplevel'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -66,6 +125,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
         result = subprocess.run(
             ['git', 'rev-parse', '--git-dir'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -123,6 +183,7 @@ def _is_worktree(path: Path) -> bool:
         result = subprocess.run(
             ['git', 'rev-parse', '--git-common-dir'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -139,6 +200,7 @@ def _is_worktree(path: Path) -> bool:
         result2 = subprocess.run(
             ['git', 'rev-parse', '--git-dir'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -171,6 +233,7 @@ def _is_submodule(path: Path) -> bool:
         result = subprocess.run(
             ['git', 'rev-parse', '--show-superproject-working-tree'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -200,6 +263,7 @@ def _is_bare_repository(path: Path) -> bool:
         result = subprocess.run(
             ['git', 'rev-parse', '--is-bare-repository'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -226,6 +290,7 @@ def _get_superproject_root(path: Path) -> Optional[Path]:
         result = subprocess.run(
             ['git', 'rev-parse', '--show-superproject-working-tree'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -251,6 +316,7 @@ def check_git_available() -> bool:
     try:
         result = subprocess.run(
             ['git', '--version'],
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -271,6 +337,7 @@ def get_git_version() -> Optional[str]:
     try:
         result = subprocess.run(
             ['git', '--version'],
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,

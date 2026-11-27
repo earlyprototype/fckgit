@@ -1,79 +1,35 @@
-# Case Study: Why the MCP Server Sometimes Commits the Wrong Repo
+# How the MCP server selects a repository
 
-**Status: known limitation.** Workspace is detected once at server startup
-(`mcp_server/server.py`, module scope). The `fckgit_debug` tool exposes the
-mismatch; per-request re-detection is the planned fix and has not shipped yet.
+Earlier versions selected a workspace when the server started. If an editor
+switched from project A to B in the same session, status, staging and commits
+could still run in A.
 
-## Symptom
+Each tool call now selects its workspace once. Every Git command in that
+operation, including a requested push or rebase, uses the selected directory.
+The server clears inherited Git repository overrides such as `GIT_DIR`,
+`GIT_WORK_TREE` and `GIT_INDEX_FILE` for discovery and Git commands.
+A watcher starts in the selected repository with the same overrides cleared.
 
-fckgit's MCP server sometimes doesn't see changes in the project you're
-working on. It looks like the server is stuck pointing at whichever
-directory it started in.
+## Selection order
 
-## Root Cause
+1. The tool's optional `workspace_path` argument, an absolute directory path.
+2. The current root returned by the client's MCP `roots/list` callback, if the
+   client advertises roots.
+3. The folder in `WORKSPACE_FOLDER_PATHS`.
+4. The directory in `PROJECT_ROOT`.
+5. The Git root for the server's current working directory. Outside a
+   repository, `fckgit_debug` can still report the current directory.
 
-```python
-# mcp_server/server.py — module scope, runs once per process
-_workspace_path = _workspace_detector.detect_workspace()
-```
+If a client returns zero or several roots, pass `workspace_path` to select
+a repository. The same applies to a multi-folder `WORKSPACE_FOLDER_PATHS`.
+An unreadable root list or an invalid target stops the request before staging.
 
-The MCP server is a long-running process:
+## Checking a switch
 
-1. Open Project A → server starts → detects Project A.
-2. Switch to Project B → the *same* server keeps running.
-3. The cached `_workspace_path` still points to Project A.
-4. Every git command operates on the wrong directory.
+Call `fckgit_status` before and after switching projects. The response names
+the selected workspace. For a client with a fixed working directory and no
+roots support, pass the active project's path on each call. The process
+environment alone cannot communicate a project switch to a running server.
 
-## Detection Strategy
-
-`WorkspaceDetector` (`mcp_server/workspace.py`) resolves the workspace in
-priority order:
-
-1. `override` parameter (manual)
-2. `WORKSPACE_FOLDER_PATHS` (Cursor/VSCode)
-3. `PROJECT_ROOT` (manual config)
-4. `git rev-parse --show-toplevel` from cwd
-5. `Path.cwd()` fallback
-
-All of these are read at process startup, so none of them help once the
-editor switches projects under a running server.
-
-## Dead End: The MCP Roots Protocol
-
-The obvious "proper" fix looked like the MCP roots protocol — but
-inspecting the Python SDK showed `roots/list` is a request the **server
-sends to the client**, not something the server implements:
-
-```python
-# mcp/server/session.py
-async def list_roots(self) -> types.ListRootsResult:
-    """Send a roots/list request."""
-```
-
-There is no `list_roots` decorator on the server side. Whether Cursor
-answers this request at all is untested, so it can't be the primary
-mechanism.
-
-## Diagnosis Tooling
-
-The `fckgit_debug` tool was extended to make the bug observable:
-
-- when and how the workspace was detected, and time elapsed since
-- a fresh detection run compared against the cached value
-  (`WORKSPACE_MISMATCH: true` confirms the bug live)
-- all workspace/project/cursor environment variables
-- git repo info and detector cache statistics
-
-`WorkspaceDetector` also caches `git rev-parse` lookups with a TTL and
-exposes `get_cache_stats()` / `invalidate_cache()`.
-
-## Fix Options Considered
-
-| Option | Verdict |
-|--------|---------|
-| **A. Re-detect on every tool call** (short-TTL cache) | Recommended — simple, reliable, no client cooperation needed |
-| **B. Request roots from client** | Proper MCP, but client support is unverified |
-| **C. Hybrid** (roots on init, env fallback, per-call re-detect) | Best long-term, most complexity |
-
-Option A is the intended next step; until it lands, restarting the IDE (and
-with it the MCP server) after switching projects is the workaround.
+Use `fckgit_debug` to inspect the selected path, Git root and Git directory.
+Both diagnostic tools work before Gemini is configured.

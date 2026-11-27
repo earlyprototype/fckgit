@@ -117,17 +117,9 @@ def git_submodule(git_repo: Path, temp_dir: Path) -> Path:
         capture_output=True
     )
     
-    # Add as submodule
-    # Configure git to allow file:// protocol (needed for testing)
-    subprocess.run(
-        ['git', 'config', '--global', 'protocol.file.allow', 'always'],
-        check=False,
-        capture_output=True
-    )
-    
     submodule_path = git_repo / 'submodule'
     result = subprocess.run(
-        ['git', 'submodule', 'add', str(submodule_source), 'submodule'],
+        ['git', '-c', 'protocol.file.allow=always', 'submodule', 'add', str(submodule_source), 'submodule'],
         cwd=str(git_repo),
         capture_output=True
     )

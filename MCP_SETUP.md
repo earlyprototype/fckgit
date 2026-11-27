@@ -12,7 +12,16 @@ pip install -e ".[mcp]"
 
 ### 2. Get Your API Key
 
-Get a free Gemini API key: https://makersuite.google.com/app/apikey
+Set `GEMINI_API_KEY` in the server environment or in a Git-ignored `.env`
+file in the selected workspace. CLI help, `fckgit_status`,
+`fckgit_debug` and commits with a supplied message work without a key.
+Automatic staging checks pending files for Gemini key assignments even when
+the server uses a different key. It recognizes UTF-16 files with a byte
+order mark. Message generation reads those files from the index when Git
+reports a binary diff. If the staged tree changes while Gemini prepares a
+message, review the staged files and retry the commit. Automatic commits
+run the hooks selected by Git's effective `core.hooksPath`.
+[Get a Gemini API key](https://makersuite.google.com/app/apikey).
 
 ### 3. Configure (Choose Your IDE)
 
@@ -47,7 +56,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload Cursor: `Ctrl+Shift+P` → "Developer: Reload Window"
 
-**Done.** Switch projects in Cursor, fckgit follows automatically.
+When the client supplies a single MCP root, switching projects updates the target on the next call. With multiple roots, pass an absolute `workspace_path` to select the repository.
 
 ### VSCode (with MCP Extension)
 
@@ -72,7 +81,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload VSCode
 
-**Done.** Auto-detects your workspace like Cursor.
+Use `fckgit_status` to see the selected workspace.
 
 ### Claude Desktop
 
@@ -181,6 +190,13 @@ Tell your AI assistant:
 - `fckgit_push` - Push to remote
 - `fckgit_cleanup_lock` - Clean up git lock files
 
+The push tool runs `git push` in the selected repository. Git selects the
+remote using the branch configuration and `remote.pushDefault`. If the server
+filters an inherited transport override such as `remote.origin.pushurl`, it
+stops before pushing. Move that override from the server environment to the
+selected repository's Git configuration.
+If the remote has no configured push refspec, `push.default=nothing` makes Git refuse the push.
+
 ## Testing
 
 1. Restart your AI assistant (Cursor/Claude Desktop)
@@ -278,7 +294,7 @@ If you need to force a specific project path (e.g., for testing or unusual setup
 }
 ```
 
-Both methods override automatic detection. Restart Cursor after changing these settings.
+These settings supply a fallback when the client does not advertise roots. Restart the server after editing its launch configuration. To select a repository for one call, pass its absolute path in `workspace_path`.
 
 ### Debug Logging
 
@@ -320,11 +336,11 @@ For technical details about the implementation, see [mcp_server/README.md](mcp_s
 
 **Key Features:**
 
-1. **Automatic workspace detection**: Works out of the box in Cursor - just switch projects!
+1. **Workspace selection**: Each call uses its explicit workspace path, live client root, or configured fallback.
 2. **Security first**: Never uses `shell=True`, validates all inputs
 3. **Git-native detection**: Uses git commands to handle worktrees, submodules, etc.
 4. **Robust error handling**: Clear error messages for easy debugging
-5. **Performance**: Thread-safe caching with 60s TTL, <1ms cached lookups
+5. **Caching**: Git root lookups are scoped to the current request.
 6. **Cross-platform**: Windows, Mac, Linux support with platform-specific optimisations
 
 ## Examples

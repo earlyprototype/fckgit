@@ -6,18 +6,14 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
-try:
-    from google import genai
-except ImportError:
-    print("google-genai not installed. Run: pip install google-genai")
-    sys.exit(1)
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+from fckgit_gemini import (
+    GeminiConfigurationError, check_diff_for_key, check_files_before_staging, check_staged_encodings,
+    configured_key, get_client,
+)
+from fckgit_index import StagedChanges
 
 import psutil
 from mcp.server.models import InitializationOptions
@@ -27,7 +23,7 @@ import mcp.server.stdio
 
 # Import our new modules
 from .workspace import WorkspaceDetector, WorkspaceError, InvalidWorkspaceError
-from .git_utils import detect_git_repo_type, check_git_available
+from .git_utils import GitUtilsError, detect_git_repo_type, workspace_git_env
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
 
@@ -35,31 +31,36 @@ from .logging_config import setup_logging, init_logger
 setup_logging(level=os.environ.get('LOG_LEVEL', 'INFO'))
 logger = init_logger('mcp_server')
 
-# Configure Gemini
-api_key = os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    print("GEMINI_API_KEY environment variable not set.")
-    sys.exit(1)
-
-client = genai.Client(api_key=api_key)
-
 # Create MCP server
 server = Server("fckgit")
 
 # Track running watch processes
 _watch_processes: dict[str, subprocess.Popen] = {}
 
-# Initialize workspace detector
-_workspace_detector = WorkspaceDetector()
 
-# Detect workspace at startup
-try:
-    _workspace_path = _workspace_detector.detect_workspace()
-    logger.info("Workspace detected", workspace=str(_workspace_path))
-except WorkspaceError as e:
-    logger.error("Failed to detect workspace", error=str(e))
-    _workspace_path = Path.cwd()
-    logger.warning("Using current directory as fallback", workspace=str(_workspace_path))
+async def client_workspace_path() -> Optional[str]:
+    """Read live roots when the connected client advertises them."""
+    try:
+        session = server.request_context.session
+    except LookupError:
+        return None
+    if not session.check_client_capability(types.ClientCapabilities(roots=types.RootsCapability())):
+        return None
+    try:
+        roots = (await session.list_roots()).roots
+    except Exception as exc:
+        raise WorkspaceError("Cannot read client roots. Supply a workspace_path.") from exc
+    if len(roots) != 1:
+        raise WorkspaceError("Ambiguous workspace. Supply one workspace_path.")
+    uri = urlsplit(str(roots[0].uri))
+    if uri.scheme != "file" or uri.query or uri.fragment:
+        raise InvalidWorkspaceError("The client root must be a file URI.")
+    path = uri.path
+    if uri.netloc and uri.netloc.lower() != "localhost":
+        if sys.platform != "win32":
+            raise InvalidWorkspaceError("The client root must be a local directory.")
+        path = f"//{uri.netloc}{path}"
+    return url2pathname(path)
 
 
 @dataclass
@@ -74,7 +75,7 @@ class GitCommandResult:
 
 async def run_git_command(
     cmd: list[str],
-    cwd: Optional[Path] = None,
+    cwd: Path,
     timeout: float = 15.0,
     retry: int = 1
 ) -> GitCommandResult:
@@ -83,7 +84,7 @@ async def run_git_command(
     
     Args:
         cmd: Git command as list (e.g., ['git', 'status'])
-        cwd: Working directory (auto-detected if None)
+        cwd: Workspace selected for this request
         timeout: Command timeout in seconds
         retry: Number of retries for transient failures
         
@@ -108,23 +109,13 @@ async def run_git_command(
             command=' '.join(cmd)
         )
     
-    # Determine working directory
-    if cwd is None:
-        try:
-            cwd = _workspace_path
-        except Exception as e:
-            logger.error("Failed to get workspace path", error=str(e))
-            return GitCommandResult(
-                stdout="",
-                stderr=f"Failed to determine workspace: {e}",
-                returncode=1,
-                duration=0.0,
-                command=' '.join(cmd)
-            )
-    
     # Get platform-specific subprocess kwargs
     kwargs = get_subprocess_kwargs(is_background=False, timeout=timeout)
     kwargs['cwd'] = str(cwd)
+    try:
+        kwargs['env'] = workspace_git_env(operation=cmd[1])
+    except GitUtilsError as exc:
+        return GitCommandResult("", str(exc), 1, 0.0, " ".join(cmd))
     
     # Log command execution (without sensitive data)
     cmd_str = ' '.join(cmd)
@@ -194,25 +185,19 @@ async def run_git_command(
     )
 
 
-async def get_diff() -> str:
+async def get_diff(workspace: Path) -> str:
     """Get unstaged changes."""
-    result = await run_git_command(["git", "diff"])
+    result = await run_git_command(["git", "diff", "--no-relative", "--no-color"], workspace)
     return result.stdout if result.returncode == 0 else ""
 
 
-async def get_staged_diff() -> str:
+async def get_staged_diff(workspace: Path) -> str:
     """Get staged changes."""
-    result = await run_git_command(["git", "diff", "--cached"])
+    result = await run_git_command(["git", "diff", "--cached", "--no-relative", "--no-color"], workspace)
     return result.stdout if result.returncode == 0 else ""
 
 
-async def get_git_status() -> str:
-    """Get git status."""
-    result = await run_git_command(["git", "status", "--porcelain"])
-    return result.stdout if result.returncode == 0 else ""
-
-
-def generate_commit_message(diff: str) -> str:
+def generate_commit_message(diff: str, workspace: Optional[Path] = None) -> str:
     """Generate commit message using Gemini."""
     if not diff.strip():
         return "chore: Update files"
@@ -229,6 +214,8 @@ Changes:
 
 Output ONLY the commit message, nothing else."""
     
+    check_diff_for_key(diff, workspace)
+    client = get_client(workspace)
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -239,7 +226,7 @@ Output ONLY the commit message, nothing else."""
         return f"chore: Update files (AI error: {str(e)})"
 
 
-def generate_silicon_valley_message(diff: str) -> str:
+def generate_silicon_valley_message(diff: str, workspace: Optional[Path] = None) -> str:
     """Generate a FAANG-tier professional commit message."""
     if not diff.strip():
         return "refactor: Optimize codebase architecture for improved maintainability"
@@ -265,6 +252,8 @@ Output format:
 
 Output ONLY the commit message, nothing else."""
     
+    check_diff_for_key(diff, workspace)
+    client = get_client(workspace)
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -275,7 +264,7 @@ Output ONLY the commit message, nothing else."""
         return f"refactor: Implement strategic codebase improvements\n\nEnhanced system architecture to improve maintainability and operational excellence. This change aligns with industry best practices and positions the codebase for future scalability."
 
 
-def professionalize_message(casual_message: str) -> str:
+def professionalize_message(casual_message: str, workspace: Optional[Path] = None) -> str:
     """Transform a casual commit message into a FAANG-tier professional one."""
     if not casual_message.strip():
         return "refactor: Optimize codebase architecture"
@@ -299,6 +288,7 @@ Output format:
 
 Output ONLY the professional commit message, nothing else."""
     
+    client = get_client(workspace)
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -309,9 +299,9 @@ Output ONLY the professional commit message, nothing else."""
         return f"refactor: {casual_message}\n\nImplemented strategic improvements to enhance system architecture and operational efficiency. This change improves maintainability and positions the codebase for future scalability."
 
 
-def cleanup_git_lock():
+def cleanup_git_lock(workspace: Path):
     """Remove stale git lock file if it exists."""
-    lock_file = _workspace_path / ".git" / "index.lock"
+    lock_file = workspace / ".git" / "index.lock"
     if lock_file.exists():
         try:
             lock_file.unlink()
@@ -323,32 +313,49 @@ def cleanup_git_lock():
     return False
 
 
-async def commit_changes(message: str, stage_all: bool = True) -> tuple[bool, str]:
+async def stage_all_changes(workspace: Path) -> Optional[str]:
+    try:
+        await asyncio.get_running_loop().run_in_executor(
+            None, check_files_before_staging, workspace, workspace_git_env()
+        )
+    except RuntimeError as exc:
+        return str(exc)
+    result = await run_git_command(["git", "add", "-A"], workspace)
+    if result.returncode:
+        return f"Failed to stage files: {result.stderr.strip()}"
+    return None
+
+
+async def commit_changes(workspace: Path, message: str, stage_all: bool = True,
+                         staged: Optional[StagedChanges] = None) -> tuple[bool, str]:
     """Stage all changes and commit."""
-    cleanup_git_lock()
-    
     if stage_all:
-        result = await run_git_command(["git", "add", "-A"])
-        if result.returncode != 0:
-            return False, "Failed to stage files"
+        error = await stage_all_changes(workspace)
+        if error:
+            return False, error
     
-    result = await run_git_command(["git", "commit", "-m", message])
-    
-    if result.returncode == 0:
-        # Get the commit hash
-        hash_result = await run_git_command(["git", "rev-parse", "--short", "HEAD"])
-        commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
-        return True, f"Committed successfully [{commit_hash}]: {message}"
+    if staged is not None:
+        try:
+            await asyncio.get_running_loop().run_in_executor(
+                None, staged.commit, message, workspace, workspace_git_env(operation="commit")
+            )
+        except (GitUtilsError, RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"Commit failed: {exc}"
     else:
-        error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
-        if "nothing to commit" in error_msg.lower():
-            return False, "Nothing to commit"
-        return False, f"Commit failed: {error_msg}"
+        result = await run_git_command(["git", "commit", "-m", message], workspace)
+        if result.returncode:
+            error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+            if "nothing to commit" in error_msg.lower():
+                return False, "Nothing to commit"
+            return False, f"Commit failed: {error_msg}"
+    hash_result = await run_git_command(["git", "rev-parse", "--short", "HEAD"], workspace)
+    commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
+    return True, f"Committed successfully [{commit_hash}]: {message}"
 
 
-async def push_to_remote() -> tuple[bool, str]:
+async def push_to_remote(workspace: Path) -> tuple[bool, str]:
     """Push to remote repository."""
-    result = await run_git_command(["git", "push"])
+    result = await run_git_command(["git", "push"], workspace)
     
     if result.returncode == 0:
         return True, "Successfully pushed to remote"
@@ -358,11 +365,11 @@ async def push_to_remote() -> tuple[bool, str]:
     # Try to handle rejected push
     if "rejected" in error_msg.lower() or "fetch first" in error_msg.lower():
         # Try to pull with rebase
-        pull_result = await run_git_command(["git", "pull", "--rebase"])
+        pull_result = await run_git_command(["git", "pull", "--rebase"], workspace)
         
         if pull_result.returncode == 0:
             # Try pushing again
-            retry_result = await run_git_command(["git", "push"])
+            retry_result = await run_git_command(["git", "push"], workspace)
             if retry_result.returncode == 0:
                 return True, "Pulled, rebased, and pushed successfully"
             return False, "Failed to push after rebase"
@@ -371,12 +378,12 @@ async def push_to_remote() -> tuple[bool, str]:
     return False, f"Push failed: {error_msg}"
 
 
-async def get_repo_path() -> str:
+async def get_repo_path(workspace: Path) -> str:
     """Get the current repository root path."""
-    result = await run_git_command(["git", "rev-parse", "--show-toplevel"])
+    result = await run_git_command(["git", "rev-parse", "--show-toplevel"], workspace)
     if result.returncode == 0:
         return result.stdout.strip()
-    return str(_workspace_path)
+    return str(workspace)
 
 
 def find_fckgit_processes() -> list[dict[str, Any]]:
@@ -404,9 +411,9 @@ def find_fckgit_processes() -> list[dict[str, Any]]:
     return processes
 
 
-async def start_watch_mode(cooldown: int = 30, faang_mode: bool = False) -> tuple[bool, str, Optional[int]]:
+async def start_watch_mode(workspace: Path, cooldown: int = 30, faang_mode: bool = False) -> tuple[bool, str, Optional[int]]:
     """Start fckgit in watch mode as a background process."""
-    repo_path = await get_repo_path()
+    repo_path = await get_repo_path(workspace)
     
     # Check if already running in this repo
     # Normalize paths for comparison (handles Windows forward/backslash differences)
@@ -418,32 +425,25 @@ async def start_watch_mode(cooldown: int = 30, faang_mode: bool = False) -> tupl
             return False, f"fckgit watch already running (PID: {proc['pid']})", proc['pid']
     
     # Build command with cooldown and faang mode
-    cmd = [sys.executable, "-m", "fckgit", "--cooldown", str(cooldown)]
+    script = Path(__file__).resolve().parent.parent / "fckgit.py"
+    cmd = [sys.executable, "-E", str(script), "--cooldown", str(cooldown)]
     if faang_mode:
         cmd.append("--faang")
     
     # Start the process
     try:
-        # Use CREATE_NEW_PROCESS_GROUP on Windows or start_new_session on Unix
+        env = workspace_git_env(operation="push")
+        key = configured_key(workspace)
+        if key:
+            env["GEMINI_API_KEY"] = key
         if sys.platform == 'win32':
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-            process = subprocess.Popen(
-                cmd,
-                cwd=repo_path,
-                creationflags=creationflags,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL
-            )
+            background = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW}
         else:
-            process = subprocess.Popen(
-                cmd,
-                cwd=repo_path,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL
-            )
+            background = {"start_new_session": True}
+        process = subprocess.Popen(
+            cmd, cwd=repo_path, env=env, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **background,
+        )
         
         # Store the process
         _watch_processes[repo_path] = process
@@ -453,30 +453,16 @@ async def start_watch_mode(cooldown: int = 30, faang_mode: bool = False) -> tupl
         return False, f"Failed to start watch mode: {str(e)}", None
 
 
-async def stop_watch_mode(pid: Optional[int] = None) -> tuple[bool, str]:
+async def stop_watch_mode(workspace: Path, pid: Optional[int] = None) -> tuple[bool, str]:
     """Stop a running fckgit watch process."""
-    repo_path = await get_repo_path()
+    repo_path = await get_repo_path(workspace)
     
-    # If PID provided, try to kill that specific process
-    if pid:
-        try:
-            proc = psutil.Process(pid)
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except psutil.TimeoutExpired:
-                proc.kill()
-            return True, f"Stopped fckgit watch process (PID: {pid})"
-        except psutil.NoSuchProcess:
-            return False, f"Process {pid} not found"
-        except Exception as e:
-            return False, f"Failed to stop process {pid}: {str(e)}"
-    
-    # Otherwise, find and stop process for current repo
     # Normalize paths for comparison (handles Windows forward/backslash differences)
     repo_path_normalized = str(Path(repo_path).resolve())
     existing = find_fckgit_processes()
     for proc_info in existing:
+        if pid is not None and proc_info['pid'] != pid:
+            continue
         proc_cwd_normalized = str(Path(proc_info['cwd']).resolve()) if proc_info['cwd'] != 'unknown' else 'unknown'
         if proc_cwd_normalized == repo_path_normalized:
             try:
@@ -493,9 +479,9 @@ async def stop_watch_mode(pid: Optional[int] = None) -> tuple[bool, str]:
     return False, "No fckgit watch process found for this repository"
 
 
-async def get_watch_status() -> tuple[bool, str]:
+async def get_watch_status(workspace: Path) -> tuple[bool, str]:
     """Check if fckgit watch is running in current repo."""
-    repo_path = await get_repo_path()
+    repo_path = await get_repo_path(workspace)
     existing = find_fckgit_processes()
     
     # Normalize paths for comparison (handles Windows forward/backslash differences)
@@ -520,7 +506,7 @@ async def get_watch_status() -> tuple[bool, str]:
 @server.list_tools()
 async def handle_list_tools() -> list[types.Tool]:
     """List available tools."""
-    return [
+    tools = [
         types.Tool(
             name="fckgit_debug",
             description="Debug MCP server configuration and git repo detection",
@@ -692,19 +678,47 @@ async def handle_list_tools() -> list[types.Tool]:
         )
     ]
 
+    for tool in tools:
+        tool.inputSchema["properties"]["workspace_path"] = {
+            "type": "string",
+            "description": "Absolute path to the workspace for this request. Use to select one of several roots.",
+        }
+    return tools
+
 
 @server.call_tool()
 async def handle_call_tool(
     name: str, arguments: dict[str, Any] | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool execution requests."""
+    try:
+        return await _call_tool(name, arguments)
+    except GeminiConfigurationError as exc:
+        return [types.TextContent(type="text", text=str(exc))]
+
+
+async def _call_tool(name: str, arguments: dict[str, Any] | None):
     
     if arguments is None:
         arguments = {}
     
+    detector = WorkspaceDetector()
+    try:
+        target = arguments.get("workspace_path")
+        if "workspace_path" not in arguments:
+            target = await client_workspace_path()
+        elif not isinstance(target, str) or not Path(target).is_absolute():
+            raise InvalidWorkspaceError("workspace_path must be an absolute directory path.")
+        workspace = detector.detect_workspace(override=target)
+    except WorkspaceError as exc:
+        return [types.TextContent(type="text", text=f"Error: {exc}")]
+
+    if name in {"fckgit_generate_message", "fckgit_commit", "fckgit_silicon_valley",
+                "fckgit_professionalize", "fckgit_blastoff"}:
+        get_client(workspace)
+
     # Debug tool doesn't require git repo
     if name == "fckgit_debug":
-        import os.path
         import datetime
         
         debug_info = {}
@@ -713,11 +727,14 @@ async def handle_call_tool(
         debug_info["=== WORKSPACE DETECTION ==="] = ""
         
         # Current workspace info from detector
-        workspace_info = _workspace_detector.get_workspace_info()
-        debug_info["workspace_path"] = str(_workspace_path)
-        debug_info["workspace_exists"] = _workspace_path.exists()
-        debug_info["workspace_is_dir"] = _workspace_path.is_dir()
-        debug_info["detection_method"] = workspace_info.get('detection_method', 'unknown')
+        workspace_info = detector.get_workspace_info()
+        debug_info["workspace_path"] = str(workspace)
+        debug_info["workspace_exists"] = workspace.exists()
+        debug_info["workspace_is_dir"] = workspace.is_dir()
+        if target is not None and "workspace_path" not in arguments:
+            debug_info["detection_method"] = "mcp_roots"
+        else:
+            debug_info["detection_method"] = workspace_info.get('detection_method', 'unknown')
         
         if workspace_info.get('detection_timestamp'):
             timestamp = workspace_info['detection_timestamp']
@@ -728,41 +745,15 @@ async def handle_call_tool(
         debug_info["current_cwd"] = str(Path.cwd())
         debug_info["mcp_server_file"] = __file__
         
-        # Try to re-detect workspace NOW (without cache) to see if it would differ
-        try:
-            fresh_workspace = _workspace_detector._use_git_command(Path.cwd())
-            if fresh_workspace:
-                debug_info["fresh_detection_would_give"] = str(fresh_workspace)
-                debug_info["WORKSPACE_MISMATCH"] = str(fresh_workspace) != str(_workspace_path)
-        except Exception as e:
-            debug_info["fresh_detection_error"] = str(e)
-        
-        # === ENVIRONMENT VARIABLES ===
-        debug_info["=== ENVIRONMENT VARIABLES ==="] = ""
-        
-        import os
-        env_vars = {}
-        # Show ALL potentially relevant env vars
-        for var in sorted(os.environ.keys()):
-            if any(keyword in var.upper() for keyword in ['CURSOR', 'VSCODE', 'PROJECT', 'WORKSPACE', 'PWD', 'CWD', 'DIR', 'ROOT', 'PATH']):
-                value = os.environ[var]
-                # Truncate very long values (like PATH)
-                if len(value) > 500:
-                    env_vars[var] = value[:500] + "... (truncated)"
-                else:
-                    env_vars[var] = value
-        
-        debug_info["env_vars"] = env_vars
-        debug_info["total_env_vars"] = len(os.environ)
-        
-        # Specifically check for workspace detection vars
-        debug_info["WORKSPACE_FOLDER_PATHS_present"] = "WORKSPACE_FOLDER_PATHS" in os.environ
-        debug_info["PROJECT_ROOT_present"] = "PROJECT_ROOT" in os.environ
-        
+        debug_info["env_vars"] = {
+            key: os.environ[key] for key in ("WORKSPACE_FOLDER_PATHS", "PROJECT_ROOT")
+            if key in os.environ
+        }
+
         # === GIT REPOSITORY INFO ===
         debug_info["=== GIT REPOSITORY ==="] = ""
         
-        git_info = detect_git_repo_type(_workspace_path)
+        git_info = detect_git_repo_type(workspace)
         if git_info:
             debug_info["git_root"] = str(git_info.root)
             debug_info["git_dir"] = str(git_info.git_dir)
@@ -775,7 +766,7 @@ async def handle_call_tool(
             debug_info["git_repository"] = False
         
         # Try running git status
-        result = await run_git_command(["git", "status", "--porcelain"])
+        result = await run_git_command(["git", "--no-optional-locks", "status", "--porcelain"], workspace)
         debug_info["git_status_returncode"] = result.returncode
         debug_info["git_status_success"] = result.returncode == 0
         if result.returncode != 0:
@@ -786,13 +777,13 @@ async def handle_call_tool(
         
         # === CACHE STATS ===
         debug_info["=== CACHE STATS ==="] = ""
-        cache_stats = _workspace_detector.get_cache_stats()
+        cache_stats = detector.get_cache_stats()
         debug_info["cache_stats"] = cache_stats
         
         return [types.TextContent(type="text", text=str(debug_info))]
     
     # Check if in git repo (skip for debug tool)
-    result = await run_git_command(["git", "rev-parse", "--git-dir"])
+    result = await run_git_command(["git", "rev-parse", "--git-dir"], workspace)
     if result.returncode != 0:
         return [types.TextContent(
             type="text",
@@ -802,66 +793,84 @@ async def handle_call_tool(
     if name == "fckgit_status":
         include_diff = arguments.get("include_diff", False)
         
-        status = await get_git_status()
+        status_result = await run_git_command(["git", "--no-optional-locks", "status", "--porcelain"], workspace)
+        if status_result.returncode:
+            return [types.TextContent(type="text", text=f"Status failed: {status_result.stderr.strip()}")]
+        status = status_result.stdout
         if not status.strip():
             result = "No changes detected"
         else:
-            files = [line.split()[-1] for line in status.strip().split('\n') if line.strip()]
+            files = [line[3:] for line in status.splitlines()]
             result = f"Changed files ({len(files)}):\n" + "\n".join(f"  - {f}" for f in files)
             
             if include_diff:
-                staged = await get_staged_diff()
-                unstaged = await get_diff()
+                staged = await get_staged_diff(workspace)
+                unstaged = await get_diff(workspace)
                 diff = staged or unstaged
                 if diff:
                     result += f"\n\nDiff:\n{diff}"
         
-        return [types.TextContent(type="text", text=result)]
+        return [types.TextContent(type="text", text=f"Workspace: {workspace}\n{result}")]
     
     elif name == "fckgit_generate_message":
         use_staged = arguments.get("use_staged", False)
         
-        if use_staged:
-            diff = await get_staged_diff()
-        else:
-            staged = await get_staged_diff()
-            unstaged = await get_diff()
-            diff = staged or unstaged
+        diff = await get_staged_diff(workspace)
+        if diff:
+            try:
+                await asyncio.get_running_loop().run_in_executor(
+                    None, check_staged_encodings, workspace, workspace_git_env(), diff
+                )
+            except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+                return [types.TextContent(type="text", text=str(exc))]
+        elif not use_staged:
+            diff = await get_diff(workspace)
         
         if not diff.strip():
             return [types.TextContent(type="text", text="No changes to generate message for")]
         
-        message = generate_commit_message(diff)
+        message = generate_commit_message(diff, workspace)
         return [types.TextContent(type="text", text=f"Generated message: {message}")]
     
-    elif name == "fckgit_commit":
+    elif name in ("fckgit_commit", "fckgit_silicon_valley"):
         push = arguments.get("push", False)
         stage_all = arguments.get("stage_all", True)
         
         # Get diff for message generation
         if stage_all:
             # Stage first so we can see untracked files
-            await run_git_command(["git", "add", "-A"])
+            error = await stage_all_changes(workspace)
+            if error:
+                return [types.TextContent(type="text", text=error)]
         
-        staged = await get_staged_diff()
-        unstaged = await get_diff()
-        diff = staged or unstaged
-        
-        if not diff.strip():
+        try:
+            staged = await asyncio.get_running_loop().run_in_executor(
+                None, StagedChanges.read, workspace, workspace_git_env()
+            )
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            return [types.TextContent(type="text", text=f"Failed to read staged changes: {exc}")]
+
+        if not staged.diff.strip():
             return [types.TextContent(type="text", text="No changes to commit")]
         
         # Generate message
-        message = generate_commit_message(diff)
+        if name == "fckgit_silicon_valley":
+            message = generate_silicon_valley_message(staged.diff, workspace)
+        else:
+            message = generate_commit_message(staged.diff, workspace)
         
         # Commit
-        success, result_msg = await commit_changes(message, stage_all=False)  # Already staged
+        success, result_msg = await commit_changes(workspace, message, stage_all=False, staged=staged)
         
         if not success:
             return [types.TextContent(type="text", text=result_msg)]
         
+        if name == "fckgit_silicon_valley":
+            result_msg = "SILICON VALLEY MODE ACTIVATED\n\n" + result_msg
+
         # Push if requested
         if push:
-            push_success, push_msg = await push_to_remote()
+            push_success, push_msg = await push_to_remote(workspace)
             result_msg += f"\n{push_msg}"
         
         return [types.TextContent(type="text", text=result_msg)]
@@ -875,24 +884,24 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text="Error: message is required")]
         
         # Commit
-        success, result_msg = await commit_changes(message, stage_all=stage_all)
+        success, result_msg = await commit_changes(workspace, message, stage_all=stage_all)
         
         if not success:
             return [types.TextContent(type="text", text=result_msg)]
         
         # Push if requested
         if push:
-            push_success, push_msg = await push_to_remote()
+            push_success, push_msg = await push_to_remote(workspace)
             result_msg += f"\n{push_msg}"
         
         return [types.TextContent(type="text", text=result_msg)]
     
     elif name == "fckgit_push":
-        success, message = await push_to_remote()
+        success, message = await push_to_remote(workspace)
         return [types.TextContent(type="text", text=message)]
     
     elif name == "fckgit_cleanup_lock":
-        cleaned = cleanup_git_lock()
+        cleaned = cleanup_git_lock(workspace)
         if cleaned:
             return [types.TextContent(type="text", text="Cleaned up stale git lock file")]
         return [types.TextContent(type="text", text="No stale git lock file found")]
@@ -900,7 +909,7 @@ async def handle_call_tool(
     elif name == "fckgit_blastoff":
         cooldown = arguments.get("cooldown", 30)
         faang_mode = arguments.get("faang_mode", False)
-        success, message, pid = await start_watch_mode(cooldown=cooldown, faang_mode=faang_mode)
+        success, message, pid = await start_watch_mode(workspace, cooldown=cooldown, faang_mode=faang_mode)
         if success:
             result = f"BLASTOFF! {message}\n\n"
             result += "fckgit is now watching for changes and will:\n"
@@ -917,46 +926,12 @@ async def handle_call_tool(
     
     elif name == "fckgit_stop_watch":
         pid = arguments.get("pid")
-        success, message = await stop_watch_mode(pid=pid)
+        success, message = await stop_watch_mode(workspace, pid=pid)
         return [types.TextContent(type="text", text=message)]
     
     elif name == "fckgit_watch_status":
-        is_running, message = await get_watch_status()
+        is_running, message = await get_watch_status(workspace)
         return [types.TextContent(type="text", text=message)]
-    
-    elif name == "fckgit_silicon_valley":
-        push = arguments.get("push", False)
-        stage_all = arguments.get("stage_all", True)
-        
-        # Get diff for message generation
-        if stage_all:
-            # Stage first so we can see untracked files
-            await run_git_command(["git", "add", "-A"])
-        
-        staged = await get_staged_diff()
-        unstaged = await get_diff()
-        diff = staged or unstaged
-        
-        if not diff.strip():
-            return [types.TextContent(type="text", text="No changes to commit")]
-        
-        # Generate FAANG-tier professional message
-        message = generate_silicon_valley_message(diff)
-        
-        # Commit
-        success, result_msg = await commit_changes(message, stage_all=False)  # Already staged
-        
-        if not success:
-            return [types.TextContent(type="text", text=result_msg)]
-        
-        result = "SILICON VALLEY MODE ACTIVATED\n\n" + result_msg
-        
-        # Push if requested
-        if push:
-            push_success, push_msg = await push_to_remote()
-            result += f"\n{push_msg}"
-        
-        return [types.TextContent(type="text", text=result)]
     
     elif name == "fckgit_professionalize":
         casual_message = arguments.get("message")
@@ -965,7 +940,7 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text="Error: message is required")]
         
         # Transform to professional
-        professional_message = professionalize_message(casual_message)
+        professional_message = professionalize_message(casual_message, workspace)
         
         result = f"CASUAL MESSAGE:\n{casual_message}\n\n"
         result += f"PROFESSIONAL VERSION:\n{professional_message}\n\n"

@@ -17,6 +17,3 @@ jobs:
         run: pip install -e ".[mcp,test]"
       - name: Run tests
         run: pytest tests/
-        env:
-          # fckgit.py checks for the key at import time; tests never call Gemini
-          GEMINI_API_KEY: test-key-not-real
