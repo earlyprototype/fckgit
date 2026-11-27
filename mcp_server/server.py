@@ -28,8 +28,8 @@ from mcp.server import NotificationOptions, Server
 import mcp.server.stdio
 
 # Import our new modules
-from .workspace import InvalidWorkspaceError, WorkspaceDetector, WorkspaceError
-from .git_utils import detect_git_repo_type, git_environment, rev_parse
+from .workspace import InvalidWorkspaceError, WorkspaceDetector
+from .git_utils import decode_git_path, detect_git_repo_type, git_environment, rev_parse
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
 
@@ -62,6 +62,11 @@ class GitCommandResult:
     returncode: int
     duration: float  # seconds
     command: str  # for logging/debugging
+
+    def checked_stdout(self) -> str:
+        if self.returncode != 0:
+            raise RuntimeError(f"{self.command} failed (exit {self.returncode}): {self.stderr.strip()}")
+        return self.stdout
 
 
 async def run_git_command(
@@ -176,19 +181,19 @@ async def run_git_command(
 async def get_diff(cwd: Path) -> str:
     """Get unstaged changes."""
     result = await run_git_command(["git", "diff"], cwd)
-    return result.stdout if result.returncode == 0 else ""
+    return result.checked_stdout()
 
 
 async def get_staged_diff(cwd: Path) -> str:
     """Get staged changes."""
     result = await run_git_command(["git", "diff", "--cached"], cwd)
-    return result.stdout if result.returncode == 0 else ""
+    return result.checked_stdout()
 
 
 async def get_git_status(cwd: Path) -> str:
     """Get git status."""
     result = await run_git_command(["git", "status", "--porcelain"], cwd)
-    return result.stdout if result.returncode == 0 else ""
+    return result.checked_stdout()
 
 
 def generate_commit_message(diff: str) -> str:
@@ -290,10 +295,9 @@ Output ONLY the professional commit message, nothing else."""
 
 async def cleanup_git_lock(cwd: Path) -> bool:
     """Remove stale git lock file if it exists."""
-    result = await run_git_command(["git", "rev-parse", "--git-path", "index.lock"], cwd)
-    if result.returncode != 0:
-        return False
-    lock_file = cwd / result.stdout.strip()
+    result = await asyncio.to_thread(rev_parse, cwd, "--git-path", "index.lock")
+    result.check_returncode()
+    lock_file = cwd / decode_git_path(result.stdout)
     if lock_file.exists():
         try:
             lock_file.unlink()
@@ -359,7 +363,7 @@ def _is_watcher(executable: str, cmdline: list[str], cwd: Path) -> bool:
     if not re.fullmatch(r"pythonw?(?:\d+(?:\.\d+)*)?(?:\.exe)?", Path(executable).name, re.IGNORECASE):
         return False
     args = cmdline[1:]
-    while args and args[0] in ("-E", "-I", "-u"):
+    while args and args[0] in ("-B", "-E", "-I", "-u"):
         args = args[1:]
     if args[:2] == ["-m", "fckgit"]:
         args = args[2:]
@@ -395,14 +399,19 @@ def find_fckgit_processes() -> list[tuple[psutil.Process, Path]]:
             if _is_watcher(info["exe"], info["cmdline"], cwd):
                 root = rev_parse(cwd, "--show-toplevel")
                 if root.returncode == 0:
-                    processes.append((proc, Path(root.stdout.strip()).resolve()))
+                    processes.append((proc, Path(decode_git_path(root.stdout)).resolve()))
         except (psutil.Error, OSError, RuntimeError, subprocess.SubprocessError):
             continue
     return processes
 
 
-async def start_watch_mode(repo_path: Path, cooldown: int = 30, faang_mode: bool = False) -> tuple[bool, str, Optional[int]]:
+async def start_watch_mode(repo_path: Path, cooldown: int | float = 30, faang_mode: bool = False) -> tuple[bool, str, Optional[int]]:
     """Start fckgit in watch mode as a background process."""
+    # JSON Schema accepts whole-valued floats as integers. argparse needs "2" for 2.0.
+    if isinstance(cooldown, float) and cooldown.is_integer():
+        cooldown = int(cooldown)
+    if type(cooldown) is not int:
+        raise ValueError("cooldown must be an integer number of seconds")
     
     for proc, root in find_fckgit_processes():
         if root == repo_path:
@@ -577,7 +586,7 @@ async def handle_list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "cooldown": {
-                        "type": "number",
+                        "type": "integer",
                         "description": "Cooldown time in seconds between commits (default: 30)",
                         "default": 30
                     },
@@ -669,65 +678,13 @@ async def handle_call_tool(
 
     # Debug tool doesn't require git repo
     if name == "fckgit_debug":
-        import datetime
-        
-        debug_info = {}
-        
-        # === WORKSPACE DETECTION DIAGNOSTICS ===
-        debug_info["=== WORKSPACE DETECTION ==="] = ""
-        
-        # Current workspace info from detector
-        workspace_info = detector.get_workspace_info()
-        debug_info["workspace_path"] = str(cwd)
-        debug_info["workspace_exists"] = cwd.exists()
-        debug_info["workspace_is_dir"] = cwd.is_dir()
-        debug_info["detection_method"] = workspace_info.get('detection_method', 'unknown')
-        
-        if workspace_info.get('detection_timestamp'):
-            timestamp = workspace_info['detection_timestamp']
-            debug_info["detected_at"] = datetime.datetime.fromtimestamp(timestamp).isoformat()
-            debug_info["seconds_since_detection"] = round(workspace_info.get('time_since_detection', 0), 2)
-        
-        # Current process info
-        debug_info["current_cwd"] = str(Path.cwd())
-        debug_info["mcp_server_file"] = __file__
-
-        # The selected repository can differ from the server's working directory.
-        try:
-            cwd_root = detector._use_git_command(Path.cwd())
-            if cwd_root:
-                debug_info["fresh_detection_would_give"] = str(cwd_root)
-                debug_info["WORKSPACE_MISMATCH"] = cwd_root != cwd
-        except WorkspaceError as e:
-            debug_info["fresh_detection_error"] = str(e)
-        
-        # === ENVIRONMENT VARIABLES ===
-        debug_info["=== ENVIRONMENT VARIABLES ==="] = ""
-        
-        import os
-        env_vars = {}
-        # Show ALL potentially relevant env vars
-        for var in sorted(os.environ.keys()):
-            if any(keyword in var.upper() for keyword in ['CURSOR', 'VSCODE', 'PROJECT', 'WORKSPACE', 'PWD', 'CWD', 'DIR', 'ROOT', 'PATH']):
-                value = os.environ[var]
-                # Truncate very long values (like PATH)
-                if len(value) > 500:
-                    env_vars[var] = value[:500] + "... (truncated)"
-                else:
-                    env_vars[var] = value
-        
-        debug_info["env_vars"] = env_vars
-        debug_info["total_env_vars"] = len(os.environ)
-        
-        # Specifically check for workspace detection vars
-        debug_info["WORKSPACE_FOLDER_PATHS_present"] = "WORKSPACE_FOLDER_PATHS" in os.environ
-        debug_info["PROJECT_ROOT_present"] = "PROJECT_ROOT" in os.environ
-        
-        # === GIT REPOSITORY INFO ===
-        debug_info["=== GIT REPOSITORY ==="] = ""
-        
-        git_info = detect_git_repo_type(cwd)
+        debug_info = {
+            "workspace_path": str(cwd),
+            "detection_method": detector.get_workspace_info()["detection_method"],
+        }
+        git_info = await asyncio.to_thread(detect_git_repo_type, cwd)
         if git_info:
+            debug_info["git_repository"] = True
             debug_info["git_root"] = str(git_info.root)
             debug_info["git_dir"] = str(git_info.git_dir)
             debug_info["is_worktree"] = git_info.is_worktree
@@ -736,29 +693,26 @@ async def handle_call_tool(
             if git_info.superproject_root:
                 debug_info["superproject_root"] = str(git_info.superproject_root)
         else:
-            debug_info["git_repository"] = False
+            bare = await run_git_command(["git", "rev-parse", "--is-bare-repository"], cwd)
+            debug_info["git_repository"] = bare.returncode == 0
+            if bare.returncode == 0:
+                debug_info["is_bare"] = bare.stdout.strip() == "true"
         
         # Try running git status
         result = await run_git_command(["git", "status", "--porcelain"], cwd)
         debug_info["git_status_returncode"] = result.returncode
         debug_info["git_status_success"] = result.returncode == 0
-        if result.returncode != 0:
-            debug_info["git_status_error"] = result.stderr[:200] if result.stderr else ""
-        else:
-            changes_count = len([l for l in result.stdout.split('\n') if l.strip()])
-            debug_info["git_changes_detected"] = changes_count
-        
-        # === CACHE STATS ===
-        debug_info["=== CACHE STATS ==="] = ""
-        cache_stats = detector.get_cache_stats()
-        debug_info["cache_stats"] = cache_stats
+        if result.returncode == 0:
+            debug_info["git_changes_detected"] = len(result.stdout.splitlines())
         
         return [types.TextContent(type="text", text=str(debug_info))]
     
-    # Check if in git repo (skip for debug tool)
-    result = await run_git_command(["git", "rev-parse", "--git-dir"], cwd)
+    result = await run_git_command(["git", "rev-parse", "--is-inside-work-tree"], cwd)
     if result.returncode != 0:
         raise InvalidWorkspaceError(f"Cannot open Git repository at {cwd}: {result.stderr.strip()}")
+    requires_worktree = name not in ("fckgit_push", "fckgit_cleanup_lock", "fckgit_professionalize")
+    if requires_worktree and result.stdout.strip() != "true":
+        raise InvalidWorkspaceError(f"{name} requires a Git worktree at {cwd}")
     
     if name == "fckgit_status":
         include_diff = arguments.get("include_diff", False)

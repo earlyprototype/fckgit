@@ -166,7 +166,7 @@ Tell your AI assistant:
 
 **"Blastoff!"** - Start automatic watch mode (auto-commits everything)
 - `fckgit_blastoff` - Launch watch mode
-  - `cooldown` (optional): Time in seconds between commits (default: 30)
+  - `cooldown` takes a whole number of seconds between commits and defaults to 30.
   - `faang_mode` (optional): Enable Silicon Valley professional commits (default: false)
 - `fckgit_watch_status` - Check if running
 - `fckgit_stop_watch` - Stop watch mode
@@ -208,7 +208,7 @@ For calls without `repo_path`, the first folder in `WORKSPACE_FOLDER_PATHS`
 takes precedence over `PROJECT_ROOT`. An inaccessible configured folder
 produces a tool error. Correct the setting and restart the server to load
 it. With both settings absent, the server discovers Git from its working
-directory.
+directory. Git respects discovery limits such as `GIT_CEILING_DIRECTORIES`.
 
 ### Problem: "GEMINI_API_KEY not set"
 

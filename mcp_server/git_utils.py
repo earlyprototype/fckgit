@@ -15,28 +15,50 @@ from pathlib import Path
 from typing import Optional
 
 
-# Repository-local variables listed by git rev-parse --local-env-vars, plus
-# settings that redirect discovery, refs, or objects for a receiving repo.
+# Clear inherited repository selectors. Git's discovery boundaries still apply.
 _REPO_ENV = {
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CEILING_DIRECTORIES", "GIT_COMMON_DIR",
-    "GIT_CONFIG", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_DIR",
-    "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_GRAFT_FILE", "GIT_IMPLICIT_WORK_TREE",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR",
+    "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_DIR",
+    "GIT_GRAFT_FILE", "GIT_IMPLICIT_WORK_TREE",
     "GIT_INDEX_FILE", "GIT_NAMESPACE", "GIT_NO_REPLACE_OBJECTS", "GIT_OBJECT_DIRECTORY",
     "GIT_PREFIX", "GIT_QUARANTINE_PATH", "GIT_REPLACE_REF_BASE", "GIT_SHALLOW_FILE",
     "GIT_WORK_TREE",
 }
 
+_IDENTITY_CONFIG = {
+    "user.name", "user.email", "user.useconfigonly", "user.signingkey",
+    "author.name", "author.email", "committer.name", "committer.email",
+}
+
 
 def git_environment() -> dict[str, str]:
     """Let Git discover the target from cwd, preserving user identity and credentials."""
-    return {key: value for key, value in os.environ.items() if key not in _REPO_ENV}
+    env = {key: value for key, value in os.environ.items() if key not in _REPO_ENV}
+    # Numbered config can mix identity with redirects such as core.worktree.
+    count = int(env.pop("GIT_CONFIG_COUNT", "0") or 0)
+    kept = 0
+    for index in range(count):
+        key = env.pop(f"GIT_CONFIG_KEY_{index}")
+        value = env.pop(f"GIT_CONFIG_VALUE_{index}")
+        if key.lower() in _IDENTITY_CONFIG:
+            env[f"GIT_CONFIG_KEY_{kept}"] = key
+            env[f"GIT_CONFIG_VALUE_{kept}"] = value
+            kept += 1
+    if kept:
+        env["GIT_CONFIG_COUNT"] = str(kept)
+    return env
 
 
-def rev_parse(path: Path, flag: str) -> subprocess.CompletedProcess:
+def rev_parse(path: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["git", "rev-parse", flag], cwd=path, env=git_environment(),
-        capture_output=True, text=True, timeout=5.0, stdin=subprocess.DEVNULL,
+        ["git", "rev-parse", *args], cwd=path, env=git_environment(),
+        capture_output=True, timeout=5.0, stdin=subprocess.DEVNULL,
     )
+
+
+def decode_git_path(output: bytes) -> str:
+    """Decode a single rev-parse path, including any whitespace in its name."""
+    return os.fsdecode(output.removesuffix(b"\n"))
 
 
 @dataclass
@@ -78,7 +100,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
         if result.returncode != 0:
             return None
         
-        root = Path(result.stdout.strip())
+        root = Path(decode_git_path(result.stdout))
         
         # Get git directory
         result = rev_parse(path, '--git-dir')
@@ -86,7 +108,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
         if result.returncode != 0:
             return None
         
-        git_dir = Path(result.stdout.strip())
+        git_dir = Path(decode_git_path(result.stdout))
         if not git_dir.is_absolute():
             git_dir = (path / git_dir).resolve()
         
@@ -136,7 +158,7 @@ def _is_worktree(path: Path) -> bool:
         if result.returncode != 0:
             return False
         
-        common_dir = result.stdout.strip()
+        common_dir = result.stdout
         
         # In a worktree, --git-common-dir points to the main repo's .git dir
         # In a regular repo, it points to .git (same as --git-dir)
@@ -145,7 +167,7 @@ def _is_worktree(path: Path) -> bool:
         if result2.returncode != 0:
             return False
         
-        git_dir = result2.stdout.strip()
+        git_dir = result2.stdout
         
         # If they're different, it's a worktree
         return common_dir != git_dir
@@ -168,7 +190,7 @@ def _is_submodule(path: Path) -> bool:
         result = rev_parse(path, '--show-superproject-working-tree')
         
         # If there's a superproject, this is a submodule
-        return result.returncode == 0 and bool(result.stdout.strip())
+        return result.returncode == 0 and bool(decode_git_path(result.stdout))
         
     except Exception:
         return False
@@ -189,7 +211,7 @@ def _is_bare_repository(path: Path) -> bool:
     try:
         result = rev_parse(path, '--is-bare-repository')
         
-        return result.returncode == 0 and result.stdout.strip() == 'true'
+        return result.returncode == 0 and result.stdout.strip() == b'true'
         
     except Exception:
         return False
@@ -208,8 +230,8 @@ def _get_superproject_root(path: Path) -> Optional[Path]:
     try:
         result = rev_parse(path, '--show-superproject-working-tree')
         
-        if result.returncode == 0 and result.stdout.strip():
-            return Path(result.stdout.strip())
+        if result.returncode == 0 and result.stdout:
+            return Path(decode_git_path(result.stdout))
         
         return None
         

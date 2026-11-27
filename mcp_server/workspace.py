@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict
 
-from .git_utils import rev_parse
+from .git_utils import decode_git_path, rev_parse
 
 
 class WorkspaceError(Exception):
@@ -145,7 +145,7 @@ class WorkspaceDetector:
             result = rev_parse(cwd, '--show-toplevel')
             
             if result.returncode == 0:
-                repo_root = result.stdout.strip()
+                repo_root = decode_git_path(result.stdout)
                 if repo_root:
                     sanitized = self._sanitize_path(repo_root)
                     # Cache the result

@@ -55,13 +55,8 @@ mechanism.
 
 ## Diagnosis Tooling
 
-During the investigation, `fckgit_debug` reported the following information.
-
-- when and how the workspace was detected, and time elapsed since
-- a fresh detection run compared against the cached value
-  (`WORKSPACE_MISMATCH: true` confirms the bug live)
-- all workspace/project/cursor environment variables
-- git repo info and detector cache statistics
+`fckgit_debug` reports the selected workspace, how it was selected, its
+Git paths, and a status summary. Check `git_root` before committing.
 
 `WorkspaceDetector` also caches `git rev-parse` lookups with a TTL and
 exposes `get_cache_stats()` / `invalidate_cache()`.

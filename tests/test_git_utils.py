@@ -2,11 +2,13 @@
 Tests for git utilities module.
 """
 
+import os
 from pathlib import Path
 
 import pytest
 
 from mcp_server.git_utils import (
+    decode_git_path,
     detect_git_repo_type,
     check_git_available,
     get_git_version,
@@ -15,6 +17,10 @@ from mcp_server.git_utils import (
 
 class TestGitUtils:
     """Tests for git utilities."""
+
+    def test_rev_parse_path_removes_only_git_record_terminator(self):
+        name = " leading\r\nline ending in whitespace \t\n"
+        assert decode_git_path(os.fsencode(name) + b"\n") == name
     
     def test_check_git_available(self):
         """Test git availability check."""

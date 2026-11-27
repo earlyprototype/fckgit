@@ -5,6 +5,7 @@ import ast
 import os
 import subprocess
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import Mock
@@ -133,6 +134,86 @@ async def test_commit_ignores_inherited_git_target(projects):
 
 
 @pytest.mark.asyncio
+async def test_commit_respects_discovery_ceiling(git_repo):
+    child = git_repo / "unversioned"
+    child.mkdir()
+    (child / "new.txt").touch()
+    (git_repo / "README.md").write_text("parent edit")
+    head = git_output(git_repo, "rev-parse", "HEAD")
+    status = git_output(git_repo, "status", "--porcelain")
+    async with mcp_client(child, GIT_CEILING_DIRECTORIES=str(git_repo)) as session:
+        result = await session.call_tool("fckgit_commit_with_message", {"message": "Child edit"})
+        assert result.isError
+        result = await session.call_tool("fckgit_status", {"repo_path": str(child)})
+        assert result.isError
+    assert git_output(git_repo, "rev-parse", "HEAD") == head
+    assert git_output(git_repo, "status", "--porcelain") == status
+
+
+@pytest.mark.asyncio
+async def test_stdio_preserves_git_root_spelling(projects):
+    first, second = projects
+    # POSIX also allows whitespace at the end of a directory name.
+    target = second.rename(second.with_name("caf\u00e9" if os.name == "nt" else "caf\u00e9 \n"))
+    async with mcp_client(first, PYTHONUTF8="0") as session:
+        args = {"repo_path": str(target)}
+        status = await session.call_tool("fckgit_status", args)
+        assert not status.isError and "second.txt" in status.content[0].text
+        debug = await session.call_tool("fckgit_debug", args)
+        assert Path(ast.literal_eval(debug.content[0].text)["git_root"]) == target
+
+
+@pytest.mark.asyncio
+async def test_default_commit_uses_configured_identity_and_selected_worktree(projects):
+    first, second = projects
+    async with mcp_client(
+        first, PROJECT_ROOT=str(second), GIT_DIR=str(first / ".git"), GIT_CONFIG_COUNT="3",
+        GIT_CONFIG_KEY_0="user.name", GIT_CONFIG_VALUE_0="MCP Author",
+        GIT_CONFIG_KEY_1="core.worktree", GIT_CONFIG_VALUE_1=str(first),
+        GIT_CONFIG_KEY_2="user.email", GIT_CONFIG_VALUE_2="mcp@example.com",
+    ) as session:
+        result = await session.call_tool("fckgit_commit_with_message", {"message": "Second repo"})
+        assert not result.isError, result.content[0].text
+    assert git_output(second, "log", "-1", "--format=%an <%ae>") == "MCP Author <mcp@example.com>"
+    assert git_output(second, "ls-tree", "--name-only", "HEAD") == "second.txt"
+    assert git_output(first, "status", "--porcelain") == "?? first.txt"
+    assert git_output(first, "log", "-1", "--format=%s") == "Initial commit"
+
+
+@pytest.mark.asyncio
+async def test_worktree_tools_reject_git_metadata(git_repo, bare_repo):
+    async with mcp_client(git_repo) as session:
+        for path in (git_repo / ".git", bare_repo):
+            for tool in ("fckgit_status", "fckgit_generate_message", "fckgit_watch_status"):
+                result = await session.call_tool(tool, {"repo_path": str(path)})
+                assert result.isError and "work" in result.content[0].text.lower(), (tool, path)
+            debug = await session.call_tool("fckgit_debug", {"repo_path": str(path)})
+            assert not debug.isError
+            info = ast.literal_eval(debug.content[0].text)
+            assert info["git_repository"] and info["is_bare"] == (path == bare_repo)
+            assert "git_root" not in info
+
+
+@pytest.mark.asyncio
+async def test_git_read_errors_reach_the_client(git_repo):
+    (git_repo / ".git" / "index").write_bytes(b"invalid index")
+    async with mcp_client(git_repo) as session:
+        for tool in ("fckgit_status", "fckgit_generate_message"):
+            result = await session.call_tool(tool, {})
+            assert result.isError and "index" in result.content[0].text.lower()
+
+
+@pytest.mark.asyncio
+async def test_debug_keeps_unrelated_environment_private(projects):
+    first, second = projects
+    async with mcp_client(first, PROJECT_ROOT=str(second), PROJECT_SERVICE_TOKEN="private-test-marker") as session:
+        reply = await session.call_tool("fckgit_debug", {})
+        result = reply.content[0].text
+        assert "private-test-marker" not in result and "PROJECT_SERVICE_TOKEN" not in result
+        assert Path(ast.literal_eval(result)["git_root"]) == second
+
+
+@pytest.mark.asyncio
 async def test_debug_reports_selected_root_and_handles_non_repo(projects, tmp_path):
     _, second = projects
     nested = second / "src"
@@ -214,6 +295,41 @@ def test_watcher_commit_preserves_active_lock(git_repo):
 
 
 @pytest.mark.asyncio
+async def test_live_module_watcher_lifecycle(git_repo, tmp_path):
+    log = tmp_path / "watch.log"
+    with log.open("wb") as output:
+        watcher = subprocess.Popen(
+            [sys.executable, "-B", "-m", "fckgit"], cwd=git_repo,
+            env={**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"},
+            stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
+        )
+    try:
+        deadline = time.monotonic() + 30
+        while "Press Ctrl+C" not in log.read_text(encoding="utf-8"):
+            assert watcher.poll() is None and time.monotonic() < deadline, log.read_text(encoding="utf-8")
+            await asyncio.sleep(0.1)
+        args = {"repo_path": str(git_repo)}
+        status = await call("fckgit_watch_status", args)
+        assert "is running (PID:" in status, status
+        pid = int(status.split("PID: ")[1].split(")")[0])
+        assert f"already running (PID: {pid})" in await call("fckgit_blastoff", args)
+        assert "Stopped" in await call("fckgit_stop_watch", {**args, "pid": pid})
+        watcher.wait(timeout=5)
+        assert "is not running" in await call("fckgit_watch_status", args)
+    finally:
+        if watcher.poll() is None:
+            watcher.terminate()
+            watcher.wait(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_fractional_cooldown_is_an_mcp_error(git_repo):
+    async with mcp_client(git_repo) as session:
+        result = await session.call_tool("fckgit_blastoff", {"cooldown": 2.5})
+        assert result.isError and "integer" in result.content[0].text
+
+
+@pytest.mark.asyncio
 async def test_watcher_launch_uses_installed_cli_and_clean_git_env(projects, monkeypatch):
     first, second = projects
     (second / "fckgit.py").touch()
@@ -225,9 +341,13 @@ async def test_watcher_launch_uses_installed_cli_and_clean_git_env(projects, mon
     with monkeypatch.context() as launch:
         popen = Mock()
         launch.setattr(subprocess, "Popen", popen)
-        started, _, _ = await start_watch_mode(second)
+        with pytest.raises(ValueError, match="cooldown"):
+            await start_watch_mode(second, cooldown=2.5)
+        popen.assert_not_called()
+        started, _, _ = await start_watch_mode(second, cooldown=2.0)
         assert started
     (cmd,), kwargs = popen.call_args
+    assert cmd[cmd.index("--cooldown") + 1] == "2"
     assert kwargs["cwd"] == second
     env = kwargs.get("env", os.environ)
     assert "GIT_DIR" not in env and "GIT_WORK_TREE" not in env
