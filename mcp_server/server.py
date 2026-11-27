@@ -12,6 +12,7 @@ from urllib.request import url2pathname
 from fckgit_gemini import (
     GeminiConfigurationError, check_diff_for_key, check_files_before_staging, configured_key, get_client,
 )
+from fckgit_index import StagedChanges
 
 import psutil
 from mcp.server.models import InitializationOptions
@@ -182,13 +183,13 @@ async def run_git_command(
 
 async def get_diff(workspace: Path) -> str:
     """Get unstaged changes."""
-    result = await run_git_command(["git", "diff"], workspace)
+    result = await run_git_command(["git", "diff", "--no-relative", "--no-color"], workspace)
     return result.stdout if result.returncode == 0 else ""
 
 
 async def get_staged_diff(workspace: Path) -> str:
     """Get staged changes."""
-    result = await run_git_command(["git", "diff", "--cached"], workspace)
+    result = await run_git_command(["git", "diff", "--cached", "--no-relative", "--no-color"], workspace)
     return result.stdout if result.returncode == 0 else ""
 
 
@@ -321,25 +322,31 @@ async def stage_all_changes(workspace: Path) -> Optional[str]:
     return None
 
 
-async def commit_changes(workspace: Path, message: str, stage_all: bool = True) -> tuple[bool, str]:
+async def commit_changes(workspace: Path, message: str, stage_all: bool = True,
+                         staged: Optional[StagedChanges] = None) -> tuple[bool, str]:
     """Stage all changes and commit."""
     if stage_all:
         error = await stage_all_changes(workspace)
         if error:
             return False, error
     
-    result = await run_git_command(["git", "commit", "-m", message], workspace)
-    
-    if result.returncode == 0:
-        # Get the commit hash
-        hash_result = await run_git_command(["git", "rev-parse", "--short", "HEAD"], workspace)
-        commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
-        return True, f"Committed successfully [{commit_hash}]: {message}"
+    if staged is not None:
+        try:
+            await asyncio.get_running_loop().run_in_executor(
+                None, staged.commit, message, workspace, workspace_git_env()
+            )
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"Commit failed: {exc}"
     else:
-        error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
-        if "nothing to commit" in error_msg.lower():
-            return False, "Nothing to commit"
-        return False, f"Commit failed: {error_msg}"
+        result = await run_git_command(["git", "commit", "-m", message], workspace)
+        if result.returncode:
+            error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+            if "nothing to commit" in error_msg.lower():
+                return False, "Nothing to commit"
+            return False, f"Commit failed: {error_msg}"
+    hash_result = await run_git_command(["git", "rev-parse", "--short", "HEAD"], workspace)
+    commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
+    return True, f"Committed successfully [{commit_hash}]: {message}"
 
 
 async def push_to_remote(workspace: Path) -> tuple[bool, str]:
@@ -414,7 +421,8 @@ async def start_watch_mode(workspace: Path, cooldown: int = 30, faang_mode: bool
             return False, f"fckgit watch already running (PID: {proc['pid']})", proc['pid']
     
     # Build command with cooldown and faang mode
-    cmd = [sys.executable, "-m", "fckgit", "--cooldown", str(cooldown)]
+    script = Path(__file__).resolve().parent.parent / "fckgit.py"
+    cmd = [sys.executable, "-E", str(script), "--cooldown", str(cooldown)]
     if faang_mode:
         cmd.append("--faang")
     
@@ -827,19 +835,24 @@ async def _call_tool(name: str, arguments: dict[str, Any] | None):
             if error:
                 return [types.TextContent(type="text", text=error)]
         
-        diff = await get_staged_diff(workspace)
-        
-        if not diff.strip():
+        try:
+            staged = await asyncio.get_running_loop().run_in_executor(
+                None, StagedChanges.read, workspace, workspace_git_env()
+            )
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            return [types.TextContent(type="text", text=f"Failed to read staged changes: {exc}")]
+
+        if not staged.diff.strip():
             return [types.TextContent(type="text", text="No changes to commit")]
         
         # Generate message
         if name == "fckgit_silicon_valley":
-            message = generate_silicon_valley_message(diff, workspace)
+            message = generate_silicon_valley_message(staged.diff, workspace)
         else:
-            message = generate_commit_message(diff, workspace)
+            message = generate_commit_message(staged.diff, workspace)
         
         # Commit
-        success, result_msg = await commit_changes(workspace, message, stage_all=False)  # Already staged
+        success, result_msg = await commit_changes(workspace, message, stage_all=False, staged=staged)
         
         if not success:
             return [types.TextContent(type="text", text=result_msg)]

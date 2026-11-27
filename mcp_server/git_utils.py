@@ -9,6 +9,7 @@ Provides support for:
 """
 
 import os
+import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,10 +28,35 @@ _REPOSITORY_ENV = {
 
 def workspace_git_env():
     """Let Git discover the requested repository from the child's cwd."""
-    return {
+    env = {
         name: value for name, value in os.environ.items()
         if name not in _REPOSITORY_ENV and not name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))
     }
+    # Git passes -c options to child processes in GIT_CONFIG_PARAMETERS.
+    # Numbered environment options precede them in Git's precedence order.
+    settings = []
+    for i in range(int(os.environ.get("GIT_CONFIG_COUNT") or 0)):
+        settings.append((os.environ[f"GIT_CONFIG_KEY_{i}"], os.environ[f"GIT_CONFIG_VALUE_{i}"]))
+    for option in shlex.split(os.environ.get("GIT_CONFIG_PARAMETERS", "")):
+        key, equals, value = option.partition("=")
+        settings.append((key, value if equals else "true"))
+
+    count = 0
+    for key, value in settings:
+        name = key.lower()
+        if name in {"core.worktree", "core.bare", "core.hookspath", "core.fsmonitor",
+                    "core.sshcommand", "core.gitproxy", "core.alternaterefscommand",
+                    "core.repositoryformatversion", "push.default", "diff.external"}:
+            continue
+        if name.startswith(("include.", "includeif.", "extensions.", "remote.", "branch.",
+                            "url.", "submodule.", "filter.", "protocol.")):
+            continue
+        env[f"GIT_CONFIG_KEY_{count}"] = key
+        env[f"GIT_CONFIG_VALUE_{count}"] = value
+        count += 1
+    if count:
+        env["GIT_CONFIG_COUNT"] = str(count)
+    return env
 
 
 @dataclass

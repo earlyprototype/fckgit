@@ -13,10 +13,12 @@ if sys.platform == 'win32':
         pass
 
 if __package__:
+    from .fckgit_index import StagedChanges
     from .fckgit_gemini import (
         GeminiConfigurationError, check_diff_for_key, check_files_before_staging, get_client,
     )
 else:
+    from fckgit_index import StagedChanges
     from fckgit_gemini import (
         GeminiConfigurationError, check_diff_for_key, check_files_before_staging, get_client,
     )
@@ -36,15 +38,17 @@ def stage_all_changes():
         raise RuntimeError(f"Failed to stage files: {result.stderr.strip()}")
 
 
-def stage_and_get_diff():
+def prepare_staged_changes():
     """Check Gemini configuration before modifying the index."""
     get_client()
     stage_all_changes()
-    result = subprocess.run(["git", "diff", "--cached"], capture_output=True, text=True, encoding='utf-8', errors='replace')
-    if result.returncode:
-        raise RuntimeError(f"Failed to read staged changes: {result.stderr.strip()}")
-    check_diff_for_key(result.stdout)
-    return result.stdout
+    staged = StagedChanges.read(os.getcwd())
+    check_diff_for_key(staged.diff)
+    return staged
+
+
+def stage_and_get_diff():
+    return prepare_staged_changes().diff
 
 
 def generate_message(diff: str, faang_mode: bool = False) -> str:
@@ -117,7 +121,7 @@ Output ONLY the commit message, nothing else."""
         return f"refactor: Implement strategic codebase improvements\n\nEnhanced system architecture to improve maintainability and operational excellence. This change aligns with industry best practices and positions the codebase for future scalability."
 
 
-def commit(message: str, stage_all: bool = True) -> bool:
+def commit(message: str, stage_all: bool = True, staged=None) -> bool:
     """Stage all changes unless the caller has already prepared the index."""
     if stage_all:
         try:
@@ -125,27 +129,23 @@ def commit(message: str, stage_all: bool = True) -> bool:
         except RuntimeError as exc:
             print(f"❌ {exc}")
             return False
-    result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, encoding='utf-8', errors='replace')
-    if result.returncode == 0:
-        # Get the commit hash
-        hash_result = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
-        commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
-        
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        print(f"✓ Committed: {message}")
-        print(f"  [{commit_hash}] at {timestamp}")
-        return True
-    else:
-        # Check if the error is just "nothing to commit"
-        error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
-        if "nothing to commit" in error_msg.lower():
-            # This is expected when files were already committed
-            return False
+    try:
+        if staged is None:
+            result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, encoding="utf-8", errors="replace")
+            if result.returncode:
+                raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "Unknown error")
         else:
-            # This is a real error
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            print(f"❌ Commit failed at {timestamp}: {error_msg}")
-            return False
+            staged.commit(message, os.getcwd())
+    except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+        if "nothing to commit" not in str(exc).lower():
+            print(f"❌ Commit failed: {exc}")
+        return False
+    hash_result = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+    commit_hash = hash_result.stdout.strip() if hash_result.returncode == 0 else "unknown"
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"✓ Committed: {message}")
+    print(f"  [{commit_hash}] at {timestamp}")
+    return True
 
 
 def push():
@@ -205,7 +205,8 @@ class GitChangeHandler(FileSystemEventHandler):
             return False
         
         # Ignore .git folder changes
-        if '/.git/' in event.src_path.replace('\\', '/') or '\\.git\\' in event.src_path:
+        path = os.fsdecode(getattr(event, "dest_path", None) or event.src_path)
+        if ".git" in path.replace("\\", "/").split("/"):
             return False
         
         # Check cooldown
@@ -229,11 +230,13 @@ class GitChangeHandler(FileSystemEventHandler):
         """Handle file deletion events."""
         if self.should_process(event):
             self.process_changes()
+
+    def on_moved(self, event):
+        if self.should_process(event):
+            self.process_changes()
     
     def process_changes(self):
         """Process git changes."""
-        self.last_commit_time = time.time()
-        
         # Small delay to ensure file writes are complete
         time.sleep(0.5)
         
@@ -242,6 +245,7 @@ class GitChangeHandler(FileSystemEventHandler):
         if not status.strip():
             # No changes in git, silently skip (likely temp files or already committed)
             return
+        self.last_commit_time = time.time()
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         changed_files = [line[3:] for line in status.splitlines()]
@@ -255,13 +259,13 @@ class GitChangeHandler(FileSystemEventHandler):
             print("   Analyzing with AI...")
         
         try:
-            diff = stage_and_get_diff()
-            if not diff.strip():
+            staged = prepare_staged_changes()
+            if not staged.diff.strip():
                 return
-            message = generate_message(diff, faang_mode=self.faang_mode)
+            message = generate_message(staged.diff, faang_mode=self.faang_mode)
             
             if message:
-                if commit(message, stage_all=False):
+                if commit(message, stage_all=False, staged=staged):
                     push()
                 else:
                     # Commit failed - check if it's because nothing to commit
@@ -314,11 +318,11 @@ def watch_mode(faang_mode: bool = False, cooldown: int = 30):
             print("🔍 Found existing changes, committing before starting watch...")
         
         try:
-            diff = stage_and_get_diff()
-            if diff.strip():
-                message = generate_message(diff, faang_mode=faang_mode)
+            staged = prepare_staged_changes()
+            if staged.diff.strip():
+                message = generate_message(staged.diff, faang_mode=faang_mode)
                 if message:
-                    if commit(message, stage_all=False):
+                    if commit(message, stage_all=False, staged=staged):
                         push()
                         print()
         except Exception as e:
@@ -371,12 +375,12 @@ def main():
     # Single commit mode
     if args.once:
         try:
-            diff = stage_and_get_diff()
-        except RuntimeError as e:
+            staged = prepare_staged_changes()
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
             print(f"❌ {e}")
             sys.exit(1)
         
-        if not diff.strip():
+        if not staged.diff.strip():
             print("No changes to commit.")
             return
         
@@ -385,10 +389,10 @@ def main():
         else:
             print("🔍 Analyzing changes...")
         
-        message = generate_message(diff, faang_mode=args.faang)
+        message = generate_message(staged.diff, faang_mode=args.faang)
         
         if message:
-            if not commit(message, stage_all=False):
+            if not commit(message, stage_all=False, staged=staged):
                 sys.exit(1)
             push()
         else:

@@ -11,7 +11,7 @@ from contextlib import ExitStack, contextmanager
 from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import fckgit
@@ -91,6 +91,98 @@ def test_cli_commits_new_file(mode, git_repo, prompts, monkeypatch):
     assert pushed_heads == [git(git_repo, "rev-parse", "HEAD")]
 
 
+def test_watch_commits_file_saved_by_rename(git_repo, prompts, monkeypatch):
+    from watchdog.events import FileCreatedEvent, FileMovedEvent
+
+    (git_repo / ".git" / "info" / "exclude").write_text("*.draft\n")
+    handler = cli.GitChangeHandler()
+    push = Mock()
+    monkeypatch.setattr(cli, "push", push)
+    draft = git_repo / "article.draft"
+    article = git_repo / "article.txt"
+    draft.write_text("saved by rename\n")
+    handler.dispatch(FileCreatedEvent(str(draft)))
+    draft.rename(article)
+    handler.dispatch(FileMovedEvent(str(draft), str(article)))
+    assert len(prompts) == 1 and "+saved by rename" in prompts[0]
+    assert git(git_repo, "show", "HEAD:article.txt") == "saved by rename"
+    push.assert_called_once()
+
+
+@pytest.mark.parametrize("operation", ["once", "fckgit_commit"])
+def test_commit_from_subdirectory_includes_root_file(operation, git_repo, prompts, monkeypatch):
+    git(git_repo, "config", "diff.relative", "true")
+    child = git_repo / "src"
+    child.mkdir()
+    monkeypatch.chdir(child)
+    path = git_repo / "root.txt"
+    path.write_text("root payload\n")
+    if operation == "once":
+        monkeypatch.setattr(cli, "push", lambda: True)
+        run_cli(operation, monkeypatch, path)
+    else:
+        assert "Committed" in call_tool(operation, workspace_path=str(child))
+    assert len(prompts) == 1 and "+root payload" in prompts[0]
+    assert git(git_repo, "show", "HEAD:root.txt") == "root payload"
+
+
+@pytest.mark.parametrize("operation", ["once", "fckgit_commit", "fckgit_silicon_valley"])
+def test_concurrent_staging_stops_commit(operation, git_repo, monkeypatch, capsys):
+    from mcp_server import server
+
+    head = git(git_repo, "rev-parse", "HEAD")
+    path = git_repo / "first.txt"
+    path.write_text("in the prompt\n")
+    inputs = []
+
+    def stage_second(self, *, model, contents):
+        inputs.append(contents)
+        (git_repo / "second.txt").write_text("staged during generation\n")
+        git(git_repo, "add", "second.txt")
+        return SimpleNamespace(text="feat: Add first file")
+
+    monkeypatch.setattr(Models, "generate_content", stage_second)
+    if operation == "once":
+        push = Mock()
+        monkeypatch.setattr(cli, "push", push)
+        with pytest.raises(SystemExit):
+            run_cli(operation, monkeypatch, path)
+        result = capsys.readouterr().out
+    else:
+        push = AsyncMock(return_value=(True, "pushed"))
+        monkeypatch.setattr(server, "push_to_remote", push)
+        result = call_tool(operation, push=True)
+    assert "staged" in result.lower() and "changed" in result.lower()
+    assert len(inputs) == 1 and "+in the prompt" in inputs[0] and "second.txt" not in inputs[0]
+    assert git(git_repo, "rev-parse", "HEAD") == head
+    assert git(git_repo, "diff", "--cached", "--name-only").splitlines() == ["first.txt", "second.txt"]
+    push.assert_not_called()
+
+
+def test_index_stays_locked_through_git_commit(git_repo, prompts, monkeypatch):
+    path = git_repo / "first.txt"
+    path.write_text("prepared\n")
+    run = subprocess.run
+    other_writer = []
+
+    def run_with_contender(command, **kwargs):
+        if command[:2] == ["git", "commit"]:
+            (git_repo / "second.txt").write_text("another writer\n")
+            other_writer.append(run(["git", "add", "second.txt"], cwd=git_repo,
+                                    capture_output=True))
+        return run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", run_with_contender)
+    monkeypatch.setattr(cli, "push", lambda: True)
+    run_cli("once", monkeypatch, path)
+    assert len(other_writer) == 1 and other_writer[0].returncode != 0
+    assert b"index.lock" in other_writer[0].stderr
+    assert len(prompts) == 1 and "+prepared" in prompts[0]
+    assert git(git_repo, "show", "HEAD:first.txt") == "prepared"
+    assert git(git_repo, "status", "--porcelain") == "?? second.txt"
+    git(git_repo, "add", "second.txt")  # The contender can retry after publication.
+
+
 @pytest.mark.parametrize("mode", ["once", "event", "startup"])
 def test_cli_blocks_pending_credential(mode, git_repo, prompts, monkeypatch, capsys):
     monkeypatch.delenv("GEMINI_API_KEY")
@@ -152,6 +244,41 @@ def test_mcp_blocks_pending_credential_in_selected_repo(git_repo, tmp_path, prom
         assert git(git_repo, "rev-parse", "HEAD") == head
         assert git(git_repo, "status", "--porcelain") == "?? .env"
     assert not prompts
+
+
+@pytest.mark.parametrize("operation", ["once", "fckgit_commit", "fckgit_generate_message"])
+def test_workspace_assignment_with_different_client_key(operation, git_repo, prompts, monkeypatch, capsys):
+    monkeypatch.delenv("PYTHON_DOTENV_DISABLED")
+    path = git_repo / ".env"
+    path.write_text("export GEMINI_API_KEY = 'workspace-fixture'\n")
+    head = git(git_repo, "rev-parse", "HEAD")
+    if operation == "fckgit_generate_message":
+        git(git_repo, "add", ".env")
+        path.write_text("LOG_LEVEL=INFO\n")  # Only the staged version has the assignment.
+    index = (git_repo / ".git" / "index").read_bytes()
+    if operation == "once":
+        monkeypatch.setattr(cli, "push", Mock())
+        with pytest.raises(SystemExit):
+            run_cli(operation, monkeypatch, path)
+        result = capsys.readouterr().out
+    else:
+        result = call_tool(operation, use_staged=True)
+    assert "GEMINI_API_KEY" in result
+    assert "workspace-fixture" not in result and "offline-test" not in result
+    assert not prompts
+    assert git(git_repo, "rev-parse", "HEAD") == head
+    assert (git_repo / ".git" / "index").read_bytes() == index
+
+
+def test_ignored_workspace_key_copied_to_pending_file(git_repo, prompts, monkeypatch):
+    monkeypatch.delenv("PYTHON_DOTENV_DISABLED")
+    (git_repo / ".git" / "info" / "exclude").write_text(".env\n")
+    (git_repo / ".env").write_text("GEMINI_API_KEY=workspace-fixture\n")
+    (git_repo / "notes.txt").write_text("copied value: workspace-fixture\n")
+    result = call_tool("fckgit_commit")
+    assert "GEMINI_API_KEY" in result and "workspace-fixture" not in result
+    assert not prompts
+    assert git(git_repo, "status", "--porcelain") == "?? notes.txt"
 
 
 def test_staged_diff_with_removed_key_stays_local(git_repo, prompts, monkeypatch, capsys):
@@ -370,6 +497,8 @@ def test_discovery_and_watcher_ignore_repository_overrides(git_repo, tmp_path, m
     popen = subprocess.Popen
     child_roots = []
     child_has_key = []
+    watcher_help = []
+    (git_repo / "fckgit.py").touch()  # Name collision with the installed module.
     workspace = git_repo / "src"
     workspace.mkdir()
     (workspace / ".env").write_text("GEMINI_API_KEY=offline-test\n")
@@ -379,6 +508,11 @@ def test_discovery_and_watcher_ignore_repository_overrides(git_repo, tmp_path, m
 
     def launch(command, **kwargs):
         if command[0] == sys.executable:
+            with popen([*command, "--help"], cwd=kwargs["cwd"], env=kwargs["env"],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE) as probe:
+                stdout, stderr = probe.communicate(timeout=15)
+                assert probe.returncode == 0, stderr
+                watcher_help.append(stdout)
             root = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=kwargs["cwd"],
                                   env=kwargs.get("env"), capture_output=True, text=True, check=True)
             child_roots.append(Path(root.stdout.strip()))
@@ -392,3 +526,19 @@ def test_discovery_and_watcher_ignore_repository_overrides(git_repo, tmp_path, m
     assert "started" in call_tool("fckgit_blastoff", workspace_path=str(workspace))
     assert child_roots == [git_repo]
     assert child_has_key == [True]
+    assert b"--cooldown" in watcher_help[0]
+
+
+def test_mcp_keeps_git_author_settings_without_worktree_redirect(git_repo, tmp_path, prompts, monkeypatch):
+    (git_repo / "target.txt").write_text("selected workspace\n")
+    settings = [("user.name", "Environment Author"), ("core.worktree", str(tmp_path)),
+                ("user.email", "author@example.invalid")]
+    with monkeypatch.context() as inherited:
+        inherited.setenv("GIT_CONFIG_COUNT", str(len(settings)))
+        for i, (key, value) in enumerate(settings):
+            inherited.setenv(f"GIT_CONFIG_KEY_{i}", key)
+            inherited.setenv(f"GIT_CONFIG_VALUE_{i}", value)
+        assert "Committed" in call_tool("fckgit_commit", workspace_path=str(git_repo))
+    assert len(prompts) == 1 and "+selected workspace" in prompts[0]
+    assert git(git_repo, "log", "-1", "--format=%an <%ae>") == "Environment Author <author@example.invalid>"
+    assert git(git_repo, "show", "HEAD:target.txt") == "selected workspace"

@@ -15,6 +15,9 @@ pip install -e ".[mcp]"
 Set `GEMINI_API_KEY` in the server environment or in a Git-ignored `.env`
 file in the selected workspace. CLI help, `fckgit_status`,
 `fckgit_debug` and commits with a supplied message work without a key.
+Automatic staging stops if a pending file contains a Gemini key assignment,
+including when the server uses its own key. If the staged tree changes while
+Gemini prepares a message, review the staged files and retry the commit.
 [Get a Gemini API key](https://makersuite.google.com/app/apikey).
 
 ### 3. Configure (Choose Your IDE)
