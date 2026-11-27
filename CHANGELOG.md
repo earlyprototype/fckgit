@@ -4,7 +4,8 @@
 
 ### Fixed
 
-- MCP commands and retries check the filesystem identity of the selected Git directory and worktree. Replacing either directory stops the call.
+- MCP holds the selected Git directory and worktree open while Git runs. A checkout move during command startup can no longer stage files from a replacement directory.
+- MCP accepts a repository whose `core.worktree` points to a separate checkout outside any repository. It rejects a checkout owned by a different repository.
 - MCP Git operations honor signing and push settings from command-level config includes.
 - Watcher status and stop verify the target repository and recognize `python -O` and `python -OO` module launches.
 - After a server restart, watcher status, blastoff, and stop recognize running watchers launched with numbered Git config settings.

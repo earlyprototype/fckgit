@@ -9,11 +9,25 @@ Provides support for:
 """
 
 import os
+import shutil
 import stat
 import subprocess
+import sys
+import tempfile
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+if os.name == "nt":
+    import _winapi
+    import ctypes
+    from ctypes import wintypes
+
+    _create_file = ctypes.WinDLL("kernel32", use_last_error=True).CreateFileW
+    _create_file.argtypes = (wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+                             wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE)
+    _create_file.restype = wintypes.HANDLE
 
 
 # Clear inherited repository selectors. Git's discovery boundaries still apply.
@@ -109,6 +123,31 @@ def _directory_id(path: Path) -> tuple[int, int]:
     return info.st_dev, info.st_ino
 
 
+def _pin_directory(path: Path, stack: ExitStack) -> tuple[Path, int]:
+    if os.name == "nt":
+        # FILE_SHARE_READ | FILE_SHARE_WRITE permits normal Git operations.
+        # Omitting FILE_SHARE_DELETE prevents a rename until the handle closes.
+        file_flag_backup_semantics = 0x02000000  # open a directory
+        file_list_directory = 0x0001
+        handle = _create_file(str(path), file_list_directory, 3, None, _winapi.OPEN_EXISTING,
+                              file_flag_backup_semantics, None)
+        if handle == wintypes.HANDLE(-1).value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        stack.callback(_winapi.CloseHandle, handle)
+        return path, handle
+
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    stack.callback(os.close, fd)
+    if sys.platform == "darwin":
+        # macOS exposes open directories by volume and file ID.
+        info = os.fstat(fd)
+        anchor = Path("/.vol") / str(info.st_dev) / str(info.st_ino)
+    else:
+        fd_root = "/proc/self/fd" if sys.platform.startswith("linux") else "/dev/fd"
+        anchor = Path(fd_root) / str(fd)
+    return anchor, fd
+
+
 @dataclass(frozen=True)
 class GitTarget:
     """The absolute Git directory and optional working tree selected together."""
@@ -140,8 +179,79 @@ class GitTarget:
         self.verify()
         return env
 
+    @contextmanager
+    def command_context(self, *, watcher: bool = False):
+        """Keep both selected directories open through command completion."""
+        with ExitStack() as stack:
+            env = self.environment()
+            anchors = {}
+            handles = []
+            try:
+                for path, identity in self._identities:
+                    anchor, handle = _pin_directory(path, stack)
+                    if _directory_id(anchor) != identity:
+                        raise GitUtilsError(f"Directory replaced during git operation: {path}")
+                    anchors[path] = anchor
+                    handles.append(handle)
+            except OSError as exc:
+                raise GitUtilsError(f"Cannot hold directory for git operation: {path}") from exc
+
+            env["GIT_DIR"] = str(anchors[self.git_dir])
+            if self.worktree is not None:
+                env["GIT_WORK_TREE"] = str(anchors[self.worktree])
+            options = {"cwd": anchors[self.cwd], "env": env}
+            prefix = []
+            if os.name != "nt":
+                options["pass_fds"] = tuple(handles)
+                prefix = [sys.executable, "-I", "-S", str(Path(__file__).with_name("_exec_target.py")),
+                          "watch" if watcher else "run", str(self.git_dir), str(self.worktree or "")]
+            elif watcher:
+                for handle in handles:
+                    os.set_handle_inheritable(handle, True)
+                options["startupinfo"] = subprocess.STARTUPINFO(lpAttributeList={"handle_list": handles})
+            self.verify()
+            yield prefix, options
+            self.verify()
+
+    def run(self, cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+        with self.command_context() as (prefix, options):
+            if os.name != "nt" and cmd == ["git", "add", "-A"]:
+                return self._stage([*prefix, *cmd], options, kwargs)
+            return subprocess.run([*prefix, *cmd], **options, **kwargs)
+
+    def _stage(self, cmd, options, kwargs) -> subprocess.CompletedProcess:
+        # POSIX allows an open checkout to move while Git reads it. Reserve
+        # Git's normal lock and publish the staged index only after validation.
+        directory = Path(options["env"]["GIT_DIR"])
+        index = directory / "index"
+        lock = directory / "index.lock"
+        with ExitStack() as stack:
+            try:
+                reservation = lock.open("xb")
+            except FileExistsError as exc:
+                raise GitUtilsError(f"Git index.lock already exists: {lock}") from exc
+            stack.callback(lock.unlink, missing_ok=True)
+            stack.enter_context(reservation)
+            fd, name = tempfile.mkstemp(dir=directory, prefix="fckgit-index-")
+            os.close(fd)
+            private = Path(name)
+            stack.callback(private.unlink, missing_ok=True)
+            stack.callback(Path(name + ".lock").unlink, missing_ok=True)
+            if index.exists():
+                shutil.copy2(index, private)
+            else:
+                private.unlink()  # Git initializes a missing index in the repository format.
+            env = {**options["env"], "GIT_INDEX_FILE": name}
+            result = subprocess.run(cmd, **{**options, "env": env}, **kwargs)
+            if result.returncode == 0:
+                self.verify()
+                if private.exists():
+                    private.replace(index)
+            return result
+
     def rev_parse(self, *args: str) -> subprocess.CompletedProcess:
-        return rev_parse(self.cwd, *args, env=self.environment())
+        return self.run(["git", "rev-parse", *args], capture_output=True,
+                        timeout=5.0, stdin=subprocess.DEVNULL)
 
 
 def _read_git_target(path: Path, env: dict[str, str]) -> Optional[GitTarget]:
@@ -159,8 +269,16 @@ def discover_git_target(path: Path) -> Optional[GitTarget]:
     env = git_environment(discovery=True)
     target = _read_git_target(path, env)
     if target and target.worktree and target.worktree != path:
-        at_root = rev_parse(target.worktree, "--absolute-git-dir", env=env)
-        if at_root.returncode or Path(decode_git_path(at_root.stdout)).resolve() != target.git_dir:
+        at_root = rev_parse(target.worktree, "--absolute-git-dir", env={**env, "LC_ALL": "C"})
+        if at_root.returncode:
+            # An external core.worktree can have no .git entry or enclosing
+            # repository. Other discovery errors leave its ownership unknown.
+            if not at_root.stderr.startswith(b"fatal: not a git repository (or any "):
+                raise GitUtilsError(f"Cannot verify Git directory at {target.worktree}")
+            configured = rev_parse(target.git_dir, "--show-toplevel", env={**env, "GIT_DIR": str(target.git_dir)})
+            if configured.returncode or Path(decode_git_path(configured.stdout)).resolve() != target.worktree:
+                raise GitUtilsError(f"Git directory at {target.git_dir} does not select {target.worktree}")
+        elif Path(decode_git_path(at_root.stdout)).resolve() != target.git_dir:
             raise GitUtilsError(f"Worktree at {target.worktree} does not select the Git directory for {path}")
     return target
 
@@ -211,7 +329,7 @@ def detect_git_repo_type(path: Path | GitTarget) -> Optional[GitRepoInfo]:
         target = path if isinstance(path, GitTarget) else discover_git_target(path)
         if not target or not target.worktree:
             return None
-        common = target.rev_parse("--git-common-dir")
+        common = target.rev_parse("--path-format=absolute", "--git-common-dir")
         common.check_returncode()
         common_dir = (target.cwd / decode_git_path(common.stdout)).resolve()
         superproject = target.rev_parse("--show-superproject-working-tree")
@@ -220,7 +338,7 @@ def detect_git_repo_type(path: Path | GitTarget) -> Optional[GitRepoInfo]:
         return GitRepoInfo(
             root=target.worktree,
             git_dir=target.git_dir,
-            is_worktree=common_dir != target.git_dir,
+            is_worktree=not common_dir.samefile(target.git_dir),
             is_submodule=bool(parent),
             is_bare=False,
             superproject_root=Path(parent) if parent else None,

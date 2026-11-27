@@ -85,6 +85,33 @@ def test_include_cannot_attach_a_worktree_to_metadata(git_repo, tmp_path, monkey
     assert target.rev_parse("--show-toplevel").returncode != 0
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows holds the checkout against rename during staging")
+def test_move_during_git_add_discards_pending_index(git_repo, monkeypatch):
+    checkout = git_repo / "checkout"
+    checkout.mkdir()
+    subprocess.run(["git", "config", "core.worktree", str(checkout)], cwd=git_repo, check=True)
+    (checkout / "pending.txt").write_text("pending change")
+    target = discover_git_target(git_repo)
+    index = target.git_dir / "index"
+    before = index.read_bytes()
+    run = subprocess.run
+
+    def move_before_returning(cmd, **kwargs):
+        result = run(cmd, **kwargs)
+        if cmd[-3:] == ["git", "add", "-A"]:
+            result.check_returncode()
+            checkout.rename(git_repo / "moved")
+            checkout.mkdir()
+        return result
+
+    monkeypatch.setattr(subprocess, "run", move_before_returning)
+    with pytest.raises(RuntimeError, match="Directory replaced"):
+        target.run(["git", "add", "-A"])
+    assert index.read_bytes() == before
+    assert not (target.git_dir / "index.lock").exists()
+    assert not list(target.git_dir.glob("fckgit-index-*"))
+
+
 class TestGitUtils:
     """Tests for git utilities."""
 

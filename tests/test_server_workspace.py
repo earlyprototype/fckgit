@@ -2,6 +2,7 @@
 
 import asyncio
 import ast
+import io
 import os
 import shutil
 import subprocess
@@ -155,17 +156,17 @@ async def test_commit_respects_discovery_ceiling(git_repo):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("shared_root", [False, True], ids=["child-worktree", "parent-worktree"])
-async def test_stdio_commit_preserves_parent_with_core_worktree(git_repo, shared_root):
+@pytest.mark.parametrize("layout", ["child-worktree", "parent-worktree", "external-worktree"])
+async def test_stdio_commit_preserves_parent_with_core_worktree(git_repo, tmp_path, layout):
     child = git_repo / "child"
     git_output(git_repo, "init", str(child))
     git_output(child, "config", "user.name", "Test User")
     git_output(child, "config", "user.email", "test@example.com")
     git_output(child, "commit", "--allow-empty", "-m", "Child baseline")
-    checkout = child / "checkout"
+    checkout = (tmp_path if layout == "external-worktree" else child) / "checkout"
     checkout.mkdir()
     (checkout / "change.txt").write_text("child change")
-    worktree = git_repo if shared_root else checkout
+    worktree = git_repo if layout == "parent-worktree" else checkout
     git_output(child, "config", "core.worktree", str(worktree))
     readme = git_repo / "README.md"
     readme.write_text("staged parent edit")
@@ -178,13 +179,17 @@ async def test_stdio_commit_preserves_parent_with_core_worktree(git_repo, shared
     assert Path(git_output(child, "rev-parse", "--absolute-git-dir")) == child / ".git"
 
     async with mcp_client(git_repo) as session:
+        if layout == "external-worktree":
+            assert git_output(child, "status", "--porcelain") == "?? change.txt"
+            status = await session.call_tool("fckgit_status", {"repo_path": str(child)})
+            assert not status.isError and "change.txt" in status.content[0].text
         result = await session.call_tool(
             "fckgit_commit_with_message", {"repo_path": str(child), "message": "Child change"}
         )
     assert git_output(git_repo, "rev-parse", "HEAD") == head_before
     assert index.read_bytes() == index_before
     assert readme.read_text() == "unstaged parent edit"
-    if shared_root:
+    if layout == "parent-worktree":
         assert result.isError and "Git directory" in result.content[0].text
         assert git_output(child, "log", "-1", "--format=%s") == "Child baseline"
     else:
@@ -225,7 +230,8 @@ async def test_project_move_after_validation_preserves_parent(git_repo, tmp_path
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("layout", ["core.worktree", "linked"])
-async def test_replaced_checkout_blocks_staging(git_repo, monkeypatch, layout):
+@pytest.mark.parametrize("when", ["before-staging", "at-git-launch"])
+async def test_replaced_checkout_blocks_staging(git_repo, monkeypatch, layout, when):
     child = git_repo / "child"
     if layout == "linked":
         git_output(git_repo, "worktree", "add", "--detach", str(child))
@@ -252,23 +258,91 @@ async def test_replaced_checkout_blocks_staging(git_repo, monkeypatch, layout):
     parent_head = git_output(git_repo, "rev-parse", "HEAD")
     stage = server_module.stage_changes
 
-    async def move_before_staging(target):
+    attempted = False
+
+    def replace_checkout():
+        nonlocal attempted
+        attempted = True
         checkout.rename(checkout.with_name("moved"))
         checkout.mkdir()
-        await stage(target)
 
-    monkeypatch.setattr(server_module, "stage_changes", move_before_staging)
+    if when == "before-staging":
+        async def move_before_staging(target):
+            replace_checkout()
+            await stage(target)
+
+        monkeypatch.setattr(server_module, "stage_changes", move_before_staging)
+    else:
+        run = subprocess.run
+
+        def move_at_launch(cmd, **kwargs):
+            if cmd[-3:] == ["git", "add", "-A"]:
+                try:
+                    replace_checkout()
+                except PermissionError:
+                    # Windows can prevent the rename while Git uses the checkout.
+                    if os.name != "nt":
+                        raise
+            return run(cmd, **kwargs)
+
+        monkeypatch.setattr(subprocess, "run", move_at_launch)
     async with create_connected_server_and_client_session(server_module.server) as session:
         result = await session.call_tool("fckgit_commit_with_message", {
             "repo_path": str(child), "message": "Child change",
         })
-    assert result.isError, result.content
-    assert not any(checkout.iterdir())
+    assert attempted
+    if checkout.with_name("moved").exists():
+        assert result.isError, result.content
+        assert not any(checkout.iterdir())
+    else:
+        assert os.name == "nt" and when == "at-git-launch"
+        assert "Nothing to commit" in result.content[0].text
     assert git_output(git_repo, "--git-dir", str(child_dir), "rev-parse", "HEAD") == child_head
     assert (child_dir / "index").read_bytes() == child_index
     assert git_output(git_repo, "rev-parse", "HEAD") == parent_head
     assert (git_repo / ".git" / "index").read_bytes() == parent_index
     assert parent_file.read_text() == "unstaged parent edit"
+
+
+@pytest.mark.asyncio
+async def test_git_directory_replacement_at_launch_preserves_both_indexes(git_repo, tmp_path, monkeypatch):
+    git_dir = git_repo / ".git"
+    moved = tmp_path / "moved.git"
+    spare = tmp_path / "spare.git"
+    shutil.copytree(git_dir, spare)
+    git_output(git_repo, "--git-dir", str(spare), "read-tree", "--empty")
+    original_index = (git_dir / "index").read_bytes()
+    spare_index = (spare / "index").read_bytes()
+    run = subprocess.run
+    attempted = False
+
+    def replace_at_launch(cmd, **kwargs):
+        nonlocal attempted
+        if cmd[-3:] == ["git", "add", "-A"]:
+            attempted = True
+            try:
+                git_dir.rename(moved)
+            except PermissionError:
+                if os.name != "nt":
+                    raise
+            else:
+                spare.rename(git_dir)
+        return run(cmd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", replace_at_launch)
+    async with create_connected_server_and_client_session(server_module.server) as session:
+        result = await session.call_tool("fckgit_commit_with_message", {
+            "repo_path": str(git_repo), "message": "Preserve indexes",
+        })
+    assert attempted
+    if moved.exists():
+        assert result.isError, result.content
+        assert (moved / "index").read_bytes() == original_index
+        assert (git_dir / "index").read_bytes() == spare_index
+    else:
+        assert os.name == "nt" and "Nothing to commit" in result.content[0].text
+        assert (git_dir / "index").read_bytes() == original_index
+        assert (spare / "index").read_bytes() == spare_index
 
 
 @pytest.mark.asyncio
@@ -279,15 +353,21 @@ async def test_replaced_git_directory_blocks_staging_retry(git_repo, tmp_path, m
     index = (git_dir / "index").read_bytes()
     original = subprocess.run
     moved = tmp_path / "original.git"
+    sleep = asyncio.sleep
 
     def timeout_once(cmd, **kwargs):
-        if cmd == ["git", "add", "-A"] and not moved.exists():
-            git_dir.rename(moved)
-            shutil.copytree(moved, git_dir)
+        if cmd[-3:] == ["git", "add", "-A"] and not moved.exists():
             raise subprocess.TimeoutExpired(cmd, 15)
         return original(cmd, **kwargs)
 
+    async def move_between_attempts(delay):
+        if delay == 0.5 and not moved.exists():
+            git_dir.rename(moved)
+            shutil.copytree(moved, git_dir)
+        await sleep(delay)
+
     monkeypatch.setattr(subprocess, "run", timeout_once)
+    monkeypatch.setattr(asyncio, "sleep", move_between_attempts)
     async with create_connected_server_and_client_session(server_module.server) as session:
         result = await session.call_tool("fckgit_commit_with_message", {
             "repo_path": str(git_repo), "message": "Pending change",
@@ -305,10 +385,13 @@ async def test_push_retries_keep_linked_worktree_target(git_worktree, monkeypatc
     original = subprocess.run
 
     def local_git(cmd, **kwargs):
-        if cmd[1] not in ("push", "pull"):
+        if "git" not in cmd:
+            return original(cmd, **kwargs)
+        args = cmd[cmd.index("git") + 1:]
+        if args[0] not in ("push", "pull"):
             return original(cmd, **kwargs)
         env = kwargs["env"]
-        attempts.append((cmd[1:], Path(env["GIT_DIR"]), Path(env["GIT_WORK_TREE"])))
+        attempts.append((args, Path(env["GIT_DIR"]).resolve(), Path(env["GIT_WORK_TREE"]).resolve()))
         if len(attempts) == 1:
             raise subprocess.TimeoutExpired(cmd, 15)
         if len(attempts) == 2:
@@ -567,10 +650,24 @@ async def test_watcher_launch_uses_installed_cli_and_clean_git_env(projects, mon
     monkeypatch.setenv("GIT_WORK_TREE", str(first))
     monkeypatch.setattr("mcp_server.server.psutil.process_iter", lambda attrs: [])
     target = discover_git_target(second)
+    real_popen = subprocess.Popen
+    watcher = Mock(pid=22)
+    watcher.poll.return_value = None
+    watcher.stderr = io.BytesIO()
+
+    def launch_help(cmd, **kwargs):
+        assert cmd[cmd.index("--cooldown") + 1] == "2"
+        assert Path(kwargs["cwd"]).samefile(second)
+        assert Path(kwargs["env"]["GIT_DIR"]).samefile(second / ".git")
+        assert Path(kwargs["env"]["GIT_WORK_TREE"]).samefile(second)
+        kwargs["stdout"] = subprocess.PIPE
+        with real_popen([*cmd, "--help"], **kwargs) as proc:
+            stdout, _ = proc.communicate(timeout=15)
+            assert proc.returncode == 0 and b"--cooldown" in stdout
+        return watcher
+
     with monkeypatch.context() as launch:
-        popen = Mock()
-        popen.return_value.pid = 22
-        popen.return_value.poll.return_value = None
+        popen = Mock(side_effect=launch_help)
         launch.setattr(subprocess, "Popen", popen)
         launch.setattr(server_module, "_watch_processes", {})
         with pytest.raises(ValueError, match="cooldown"):
@@ -580,11 +677,3 @@ async def test_watcher_launch_uses_installed_cli_and_clean_git_env(projects, mon
         assert started
         running, message = await server_module.get_watch_status(target)
         assert running and "PID: 22" in message
-    (cmd,), kwargs = popen.call_args
-    assert cmd[cmd.index("--cooldown") + 1] == "2"
-    assert kwargs["cwd"] == second
-    env = kwargs.get("env", os.environ)
-    assert Path(env["GIT_DIR"]) == second / ".git"
-    assert Path(env["GIT_WORK_TREE"]) == second
-    help_text = subprocess.check_output([*cmd, "--help"], cwd=second, env=env, text=True)
-    assert "--cooldown" in help_text

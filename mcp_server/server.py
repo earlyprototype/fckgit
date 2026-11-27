@@ -30,7 +30,7 @@ import mcp.server.stdio
 # Import our new modules
 from .workspace import InvalidWorkspaceError, WorkspaceDetector
 from .git_utils import (
-    GitTarget, GitUtilsError, decode_git_path, detect_git_repo_type, external_watcher_target,
+    GitTarget, GitUtilsError, detect_git_repo_type, external_watcher_target,
 )
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
@@ -109,7 +109,6 @@ async def run_git_command(
     
     # Get platform-specific subprocess kwargs
     kwargs = get_subprocess_kwargs(is_background=False, timeout=timeout)
-    kwargs['cwd'] = str(target.cwd)
     
     # Log command execution (without sensitive data)
     cmd_str = ' '.join(cmd)
@@ -124,7 +123,7 @@ async def run_git_command(
             # Run command asynchronously
             result = await loop.run_in_executor(
                 None,
-                lambda: subprocess.run(cmd, env=target.environment(), **kwargs)
+                lambda: target.run(cmd, **kwargs)
             )
             
             duration = time.time() - start_time
@@ -298,19 +297,19 @@ Output ONLY the professional commit message, nothing else."""
 
 async def cleanup_git_lock(target: GitTarget) -> bool:
     """Remove stale git lock file if it exists."""
-    result = await asyncio.to_thread(target.rev_parse, "--git-path", "index.lock")
-    result.check_returncode()
-    lock_file = target.cwd / decode_git_path(result.stdout)
-    target.verify()
-    if lock_file.exists():
+    with target.command_context() as (_, options):
+        # GIT_INDEX_FILE is cleared during selection. Each worktree has its
+        # own index and index.lock directly inside the selected Git directory.
+        lock_file = Path(options["env"]["GIT_DIR"]) / "index.lock"
         try:
             lock_file.unlink()
             logger.debug("Cleaned up git lock file", lock_file=str(lock_file))
             return True
-        except Exception as e:
+        except FileNotFoundError:
+            return False
+        except OSError as e:
             logger.warning("Failed to clean up git lock file", lock_file=str(lock_file), error=str(e))
             return False
-    return False
 
 
 async def stage_changes(target: GitTarget) -> None:
@@ -446,11 +445,25 @@ async def start_watch_mode(target: GitTarget, cooldown: int | float = 30, faang_
             launch_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW}
         else:
             launch_options = {"start_new_session": True}
-        process = subprocess.Popen(
-            cmd, cwd=target.cwd, env=target.environment(),
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            **launch_options,
-        )
+        process = None
+        try:
+            with target.command_context(watcher=True) as (prefix, options):
+                process = subprocess.Popen(
+                    [*prefix, *cmd], **options, **launch_options, stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE if prefix else subprocess.DEVNULL,
+                )
+                if prefix:
+                    error = await asyncio.wait_for(asyncio.to_thread(process.stderr.read), timeout=15)
+                    if error:
+                        raise GitUtilsError(os.fsdecode(error).strip())
+        except BaseException:
+            if process is not None:
+                process.kill()
+                process.wait()
+            raise
+        finally:
+            if process is not None and process.stderr is not None:
+                process.stderr.close()
         
         # Store the process
         _watch_processes[target] = process

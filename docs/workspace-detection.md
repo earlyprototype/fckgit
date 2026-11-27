@@ -33,11 +33,16 @@ priority order:
 5. `Path.cwd()` fallback
 
 Git resolves a selected subdirectory to its worktree root and Git directory.
-If the reported root selects a different Git directory, discovery fails.
-This can happen when a nested repository sets `core.worktree` to its
-parent's worktree. The server records the device and file ID of each
-selected directory and checks them before each Git command and retry.
-A new directory at the old checkout path fails this check.
+An external `core.worktree` may have no enclosing repository. In that case,
+Git uses the directory selected at the original path for its index and refs.
+Discovery fails if the checkout selects a different Git directory, including
+when a nested repository points to its parent's worktree.
+
+Each command and retry opens the selected directories and checks their file
+identities. Windows holds handles that prevent renaming the directories while
+Git runs. On POSIX the child checks the selected paths at startup and passes
+Git references to the open directories. Staging uses a temporary index and
+publishes it under Git's index lock after both directories pass verification.
 
 If the editor keeps the server's original environment and working directory,
 pass the new project's absolute path as `repo_path`.

@@ -30,7 +30,7 @@ Each call reads the workspace settings visible to the server. An editor that kee
 
 **Manual Configuration for Others:** For IDEs/clients that don't provide workspace info (Claude Desktop, JetBrains, Neovim, etc.), users set `cwd` in the MCP config, and the server uses `git rev-parse --show-toplevel` to find the actual git root.
 
-The detector resolves symlinks and checks that the selected path is an existing directory with read and search access. When Git reports a different worktree root, both locations must resolve to the same Git directory.
+The detector resolves symlinks and checks that the selected path is an existing directory with read and search access. A separate worktree root may be outside any repository. If it belongs to another repository, discovery fails.
 
 ### 2. Git Utilities (`git_utils.py`)
 
@@ -58,6 +58,9 @@ Git directory and worktree. After a restart, discovery also recognizes the
 command configuration the server passed to the watcher at launch. Status
 and stop skip a watcher if its environment is inaccessible or its Git
 context cannot be verified.
+
+On Windows, stop a server-launched watcher before moving its checkout or
+Git directory. The watcher holds both directories open until it exits.
 
 ### 3. Platform Utilities (`platform_utils.py`)
 
