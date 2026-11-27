@@ -2,19 +2,129 @@
 Tests for git utilities module.
 """
 
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from mcp_server.git_utils import (
+    decode_git_path,
     detect_git_repo_type,
+    discover_git_target,
     check_git_available,
     get_git_version,
+    git_environment,
 )
+
+
+@pytest.mark.parametrize("source", ["numbered", "parameters"])
+def test_command_config_preserves_policy_and_discards_redirects(git_repo, monkeypatch, source):
+    settings = [
+        ("core.worktree", str(git_repo / "elsewhere")),
+        ("user.name", "O'Brien"),
+        ("commit.gpgSign", "true"),
+        ("push.default", "nothing"),
+        ("credential.helper", "example helper"),
+        ("credential.helper", ""),
+    ]
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    if source == "numbered":
+        monkeypatch.setenv("GIT_CONFIG_COUNT", str(len(settings)))
+        for i, (key, value) in enumerate(settings):
+            monkeypatch.setenv(f"GIT_CONFIG_KEY_{i}", key)
+            monkeypatch.setenv(f"GIT_CONFIG_VALUE_{i}", value)
+    else:
+        # Both Git encodings occur in the wild, including a literal apostrophe.
+        monkeypatch.setenv("GIT_CONFIG_PARAMETERS",
+                           r"'core.worktree=elsewhere' 'user.name'='O'\''Brien' "
+                           "'commit.gpgSign' 'push.default=nothing' "
+                           "'credential.helper'='example helper' 'credential.helper'=''")
+
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=git_repo, env=git_environment(), text=True)
+
+    assert Path(git("rev-parse", "--show-toplevel").rstrip("\n")) == git_repo
+    assert git("config", "--get", "user.name") == "O'Brien\n"
+    assert git("config", "--bool", "commit.gpgSign") == "true\n"
+    assert git("config", "--get", "push.default") == "nothing\n"
+    assert git("config", "--get-all", "credential.helper") == "example helper\n\n"
+
+
+@pytest.mark.parametrize("source", ["numbered", "parameters"])
+def test_command_include_preserves_signing_and_push_policy(git_repo, tmp_path, monkeypatch, source):
+    policy = tmp_path / "team.gitconfig"
+    policy.write_text(f"[core]\n\tworktree = {tmp_path.as_posix()}\n"
+                      "[commit]\n\tgpgSign = true\n[push]\n\tdefault = nothing\n")
+    if source == "numbered":
+        monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+        monkeypatch.setenv("GIT_CONFIG_KEY_0", "include.path")
+        monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(policy))
+    else:
+        monkeypatch.setenv("GIT_CONFIG_PARAMETERS", f"'include.path={policy.as_posix()}'")
+    target = discover_git_target(git_repo)
+    assert target.worktree == git_repo
+    env = target.environment()
+    root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], cwd=git_repo, env=env, text=True)
+    assert Path(root.rstrip("\n")) == git_repo
+    for key, expected in [("commit.gpgSign", "true"), ("push.default", "nothing")]:
+        args = ["git", "config", "--get", key]
+        assert subprocess.check_output(args, cwd=git_repo, text=True).strip() == expected
+        assert subprocess.check_output(args, cwd=git_repo, env=env, text=True).strip() == expected
+
+
+def test_include_cannot_attach_a_worktree_to_metadata(git_repo, tmp_path, monkeypatch):
+    policy = tmp_path / "worktree.gitconfig"
+    policy.write_text(f"[core]\n\tworktree = {tmp_path.as_posix()}\n")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "include.path")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(policy))
+    target = discover_git_target(git_repo / ".git")
+    assert target.worktree is None
+    assert target.rev_parse("--show-toplevel").returncode != 0
+
+
+def test_traced_discovery_preserves_bare_target(bare_repo, monkeypatch):
+    monkeypatch.setenv("GIT_TRACE", "1")
+    target = discover_git_target(bare_repo)
+    assert target.git_dir == bare_repo
+    assert target.worktree is None
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows holds the checkout against rename during staging")
+def test_move_during_git_add_discards_pending_index(git_repo, monkeypatch):
+    checkout = git_repo / "checkout"
+    checkout.mkdir()
+    subprocess.run(["git", "config", "core.worktree", str(checkout)], cwd=git_repo, check=True)
+    (checkout / "pending.txt").write_text("pending change")
+    target = discover_git_target(git_repo)
+    index = target.git_dir / "index"
+    before = index.read_bytes()
+    run = subprocess.run
+
+    def move_before_returning(cmd, **kwargs):
+        result = run(cmd, **kwargs)
+        if cmd[-3:] == ["git", "add", "-A"]:
+            result.check_returncode()
+            checkout.rename(git_repo / "moved")
+            checkout.mkdir()
+        return result
+
+    monkeypatch.setattr(subprocess, "run", move_before_returning)
+    with pytest.raises(RuntimeError, match="Directory replaced"):
+        target.run(["git", "add", "-A"])
+    assert index.read_bytes() == before
+    assert not (target.git_dir / "index.lock").exists()
+    assert not list(target.git_dir.glob("fckgit-index-*"))
 
 
 class TestGitUtils:
     """Tests for git utilities."""
+
+    def test_rev_parse_path_removes_only_git_record_terminator(self):
+        name = " leading\r\nline ending in whitespace \t\n"
+        assert decode_git_path(os.fsencode(name) + b"\n") == name
     
     def test_check_git_available(self):
         """Test git availability check."""

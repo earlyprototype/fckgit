@@ -143,13 +143,13 @@ class TestWorkspaceDetector:
             detector = WorkspaceDetector(cache_ttl=1)
             
             # Populate cache
-            detector._use_git_command(git_repo)
+            detector.detect_workspace()
             
             # Wait for cache to expire
             time.sleep(1.1)
             
             # Should re-detect after expiry
-            workspace = detector._use_git_command(git_repo)
+            workspace = detector.detect_workspace()
             assert workspace == git_repo
         finally:
             os.chdir(original_cwd)

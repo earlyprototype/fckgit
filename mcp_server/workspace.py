@@ -14,7 +14,9 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict
+
+from .git_utils import GitTarget, GitUtilsError, discover_git_target
 
 
 class WorkspaceError(Exception):
@@ -35,7 +37,7 @@ class InvalidWorkspaceError(WorkspaceError):
 @dataclass
 class CacheEntry:
     """Cache entry with timestamp and hit tracking."""
-    value: Path
+    value: GitTarget
     timestamp: float
     hits: int = 0
 
@@ -44,10 +46,8 @@ class WorkspaceDetector:
     """
     Thread-safe workspace detector with caching.
     
-    Detects workspace using multiple strategies:
-    1. PROJECT_ROOT environment variable (manual override)
-    2. Git command (git rev-parse --show-toplevel)
-    3. Current working directory fallback
+    Resolve the explicit path, first editor folder, project root, or current
+    directory (in that order) to its Git worktree root when available.
     """
     
     def __init__(self, cache_ttl: int = 60):
@@ -66,91 +66,45 @@ class WorkspaceDetector:
         self._detection_method: Optional[str] = None
     
     def detect_workspace(self, override: Optional[str] = None) -> Path:
-        """
-        Detect workspace directory with comprehensive error handling.
-        
-        Args:
-            override: Optional path override (takes precedence)
-            
-        Returns:
-            Path to workspace directory
-            
-        Raises:
-            InvalidWorkspaceError: If workspace cannot be determined
-        """
+        workspace, _ = self.resolve_workspace(override)
+        return workspace
+
+    def resolve_workspace(self, override: Optional[str] = None) -> tuple[Path, Optional[GitTarget]]:
+        """Select the workspace and capture its repository for this call."""
         with self._lock:
-            # Return cached workspace if already initialized and no override
-            if self._initialized and self._workspace and not override:
-                return self._workspace
-            
-            # Try detection strategies in order
-            workspace = None
-            
-            # 1. Use override if provided
-            detection_method = None
-            if override:
-                try:
-                    workspace = self._sanitize_path(override)
-                    detection_method = "override_parameter"
-                except InvalidWorkspaceError:
-                    # Log but continue to other strategies
-                    pass
-            
-            # 2. Check WORKSPACE_FOLDER_PATHS from Cursor/VSCode
-            if not workspace and 'WORKSPACE_FOLDER_PATHS' in os.environ:
-                try:
-                    # Can be semicolon-separated for multiple folders
-                    workspace_paths = os.environ['WORKSPACE_FOLDER_PATHS'].split(';')
-                    if workspace_paths:
-                        # Use the first workspace folder
-                        workspace = self._sanitize_path(workspace_paths[0].strip())
-                        detection_method = "WORKSPACE_FOLDER_PATHS"
-                except InvalidWorkspaceError:
-                    # Log but continue
-                    pass
-            
-            # 3. Check PROJECT_ROOT environment variable (manual override)
-            if not workspace and 'PROJECT_ROOT' in os.environ:
-                try:
-                    workspace = self._sanitize_path(os.environ['PROJECT_ROOT'])
-                    detection_method = "PROJECT_ROOT"
-                except InvalidWorkspaceError:
-                    # Log but continue
-                    pass
-            
-            # 4. Use git command to find repository root
-            if not workspace:
-                try:
-                    workspace = self._use_git_command(Path.cwd())
-                    detection_method = "git_rev_parse"
-                except (GitNotFoundError, InvalidWorkspaceError):
-                    # Git command failed, will fall back to cwd
-                    pass
-            
-            # 5. Fallback to current working directory
-            if not workspace:
-                try:
-                    workspace = self._sanitize_path(str(Path.cwd()))
-                    detection_method = "cwd_fallback"
-                except InvalidWorkspaceError as e:
-                    raise InvalidWorkspaceError(
-                        f"Cannot determine workspace: current directory inaccessible: {e}"
-                    )
-            
-            # Validate it's a git repository (optional, log warning if not)
-            if not self._validate_git_repo(workspace):
-                # Not a git repo, but we'll allow it (user might init later)
+            if override is not None:
+                selected = override
+                detection_method = "override_parameter"
+            elif "WORKSPACE_FOLDER_PATHS" in os.environ:
+                selected = os.environ["WORKSPACE_FOLDER_PATHS"].split(";", 1)[0].strip()
+                detection_method = "WORKSPACE_FOLDER_PATHS"
+            elif "PROJECT_ROOT" in os.environ:
+                selected = os.environ["PROJECT_ROOT"]
+                detection_method = "PROJECT_ROOT"
+            else:
+                selected = str(Path.cwd())
+                detection_method = "cwd_fallback"
+
+            workspace = self._sanitize_path(selected)
+            target = None
+            try:
+                target = self._use_git_command(workspace)
+                if target and target.worktree:
+                    workspace = target.worktree
+                    if detection_method == "cwd_fallback":
+                        detection_method = "git_rev_parse"
+            except GitNotFoundError:
                 pass
             
-            # Cache the result
+            # Record the last detection for diagnostics.
             self._workspace = workspace
             self._initialized = True
             self._detection_timestamp = time.time()
             self._detection_method = detection_method
             
-            return workspace
+            return workspace, target
     
-    def _use_git_command(self, cwd: Path) -> Optional[Path]:
+    def _use_git_command(self, cwd: Path) -> Optional[GitTarget]:
         """
         Use git command to find repository root.
         
@@ -161,7 +115,7 @@ class WorkspaceDetector:
             cwd: Current working directory to start from
             
         Returns:
-            Path to git repository root, or None if not found
+            Git directory and optional worktree, or None if not found
             
         Raises:
             GitNotFoundError: If git command is not available
@@ -180,61 +134,27 @@ class WorkspaceDetector:
                 del self._cache[cache_key]
         
         try:
-            # Use git rev-parse to find repository root
-            # This works with worktrees, submodules, etc.
-            result = subprocess.run(
-                ['git', 'rev-parse', '--show-toplevel'],
-                cwd=str(cwd),
-                capture_output=True,
-                text=True,
-                timeout=5.0,
-                stdin=subprocess.DEVNULL,
-            )
-            
-            if result.returncode == 0:
-                repo_root = result.stdout.strip()
-                if repo_root:
-                    sanitized = self._sanitize_path(repo_root)
-                    # Cache the result
-                    self._cache[cache_key] = CacheEntry(
-                        value=sanitized,
-                        timestamp=time.time(),
-                        hits=1
-                    )
-                    return sanitized
+            target = discover_git_target(cwd)
+            if target is not None:
+                if target.worktree:
+                    self._sanitize_path(str(target.worktree))
+                self._cache[cache_key] = CacheEntry(
+                    value=target,
+                    timestamp=time.time(),
+                    hits=1
+                )
+                return target
             
             return None
             
+        except GitUtilsError as e:
+            raise InvalidWorkspaceError(str(e)) from e
         except FileNotFoundError:
             raise GitNotFoundError("git command not found in PATH")
         except subprocess.TimeoutExpired:
             raise GitNotFoundError("git command timed out")
-        except Exception as e:
-            # Other errors (permission denied, etc.)
+        except OSError as e:
             raise GitNotFoundError(f"git command failed: {e}")
-    
-    def _validate_git_repo(self, path: Path) -> bool:
-        """
-        Validate that a path is actually a git repository.
-        
-        Args:
-            path: Path to validate
-            
-        Returns:
-            True if valid git repository, False otherwise
-        """
-        try:
-            result = subprocess.run(
-                ['git', 'rev-parse', '--git-dir'],
-                cwd=str(path),
-                capture_output=True,
-                text=True,
-                timeout=5.0,
-                stdin=subprocess.DEVNULL,
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
     
     def _sanitize_path(self, path: str) -> Path:
         """
@@ -250,6 +170,8 @@ class WorkspaceDetector:
             InvalidWorkspaceError: If path is invalid or insecure
         """
         try:
+            if not isinstance(path, str) or not path.strip():
+                raise InvalidWorkspaceError("Expected a non-empty directory path")
             # Resolve the path (handles symlinks, relative paths)
             resolved = Path(path).resolve(strict=False)
             
@@ -273,7 +195,7 @@ class WorkspaceDetector:
             
             return resolved
             
-        except (OSError, RuntimeError) as e:
+        except (OSError, RuntimeError, ValueError) as e:
             raise InvalidWorkspaceError(f"Invalid path: {e}")
     
     def invalidate_cache(self):

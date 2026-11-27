@@ -16,7 +16,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 ### 3. Configure (Choose Your IDE)
 
-**Using Cursor or VSCode?** → Skip to [Cursor/VSCode Setup](#cursor-ide-automatic-detection)  
+**Using Cursor or VSCode?** → Skip to [Cursor/VSCode Setup](#cursor-ide)
 **Using Claude Desktop?** → Skip to [Claude Desktop Setup](#claude-desktop)  
 **Using something else?** → Skip to [Other IDEs Setup](#other-ides--mcp-clients)
 
@@ -24,9 +24,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 ## Configuration by IDE
 
-### Cursor IDE (Automatic Detection)
-
-**Zero configuration. Just add your API key.**
+### Cursor IDE
 
 1. Open Cursor Settings: `File > Preferences > Cursor Settings > MCP`
 2. Add this config:
@@ -47,11 +45,14 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload Cursor: `Ctrl+Shift+P` → "Developer: Reload Window"
 
-**Done.** Switch projects in Cursor, fckgit follows automatically.
+When Cursor keeps the same MCP server after a project switch, pass the new
+project's absolute path as `repo_path` on each tool call. The server uses
+its own environment and working directory when you omit the argument.
+Before committing, call `fckgit_debug` with `{"repo_path": "/projects/my-app"}`
+and check that `git_root` matches your intended worktree. Pass that same
+`repo_path` to the commit tool.
 
 ### VSCode (with MCP Extension)
-
-**Same as Cursor - zero configuration.**
 
 1. Install an MCP extension for VSCode (if available)
 2. Add this to your MCP config:
@@ -72,7 +73,7 @@ Get a free Gemini API key: https://makersuite.google.com/app/apikey
 
 3. Reload VSCode
 
-**Done.** Auto-detects your workspace like Cursor.
+After switching projects, use the same `repo_path` and `git_root` check as in Cursor.
 
 ### Claude Desktop
 
@@ -165,7 +166,7 @@ Tell your AI assistant:
 
 **"Blastoff!"** - Start automatic watch mode (auto-commits everything)
 - `fckgit_blastoff` - Launch watch mode
-  - `cooldown` (optional): Time in seconds between commits (default: 30)
+  - `cooldown` takes a whole number of seconds between commits and defaults to 30.
   - `faang_mode` (optional): Enable Silicon Valley professional commits (default: false)
 - `fckgit_watch_status` - Check if running
 - `fckgit_stop_watch` - Stop watch mode
@@ -184,8 +185,8 @@ Tell your AI assistant:
 ## Testing
 
 1. Restart your AI assistant (Cursor/Claude Desktop)
-2. In a git repository, ask: "What's the git status?"
-3. If it works, you're good to go
+2. Call `fckgit_debug` with the intended repository's absolute `repo_path`.
+3. Check `git_root`, then call `fckgit_status` with the same path to see the changed files.
 
 ## Troubleshooting
 
@@ -198,10 +199,28 @@ Tell your AI assistant:
 
 ### Problem: "Wrong repository detected"
 
-**Solution:**
-- **Cursor/VSCode:** Switch to the correct project in the IDE
-- **Claude Desktop:** Fix the `cwd` path in your config file
-- Ask your AI: "run fckgit_debug" to see what path was detected
+Call `fckgit_debug` with the arguments you plan to use for the commit.
+Inspect `git_root` and `detection_method`. If the root is wrong or missing,
+pass the intended repository's absolute `repo_path` to both the debug call
+and the commit. An explicit path applies only to that call.
+
+For calls without `repo_path`, the first folder in `WORKSPACE_FOLDER_PATHS`
+takes precedence over `PROJECT_ROOT`. An inaccessible configured folder
+produces a tool error. Correct the setting and restart the server to load
+it. With both settings absent, the server discovers Git from its working
+directory. Git respects discovery limits such as `GIT_CEILING_DIRECTORIES`.
+Pass the repository directory as `repo_path` when `core.worktree` points to
+a separate checkout outside any repository. The server uses the selected
+repository's index and the configured checkout. If that checkout belongs to
+another repository, the tool returns an error.
+
+The server checks the identity of both directories on each command and retry
+and holds them open while Git runs. If a move interrupts the call, pass the
+project's current path on the next call.
+
+Overlapping `fckgit_blastoff` calls for the same checkout start one watcher.
+After renaming a watched checkout on POSIX, pass its new path to
+`fckgit_watch_status` or `fckgit_stop_watch`.
 
 ### Problem: "GEMINI_API_KEY not set"
 
@@ -242,9 +261,12 @@ Restart your IDE after updating.
 
 ### Manual Workspace Override
 
-If you need to force a specific project path (e.g., for testing or unusual setups):
+To target one call, pass a directory in the repository. For example, call
+`fckgit_status` with `{"repo_path": "/projects/my-app", "include_diff": true}`.
+Use an absolute path when the editor and server have different working
+directories. The next call can select a different repository.
 
-**Using PROJECT_ROOT (recommended):**
+**Using PROJECT_ROOT as a default**
 
 ```json
 {
@@ -278,7 +300,9 @@ If you need to force a specific project path (e.g., for testing or unusual setup
 }
 ```
 
-Both methods override automatic detection. Restart Cursor after changing these settings.
+Without `repo_path`, the server checks `WORKSPACE_FOLDER_PATHS`, then
+`PROJECT_ROOT`, then its working directory. Restart Cursor to load changes
+to the server configuration.
 
 ### Debug Logging
 
@@ -320,11 +344,11 @@ For technical details about the implementation, see [mcp_server/README.md](mcp_s
 
 **Key Features:**
 
-1. **Automatic workspace detection**: Works out of the box in Cursor - just switch projects!
+1. **Workspace selection**: Each call can specify a repository or use workspace detection.
 2. **Security first**: Never uses `shell=True`, validates all inputs
 3. **Git-native detection**: Uses git commands to handle worktrees, submodules, etc.
 4. **Robust error handling**: Clear error messages for easy debugging
-5. **Performance**: Thread-safe caching with 60s TTL, <1ms cached lookups
+5. **Consistent targeting**: A multi-step operation uses one repository from start to finish.
 6. **Cross-platform**: Windows, Mac, Linux support with platform-specific optimisations
 
 ## Examples

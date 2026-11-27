@@ -121,23 +121,19 @@ Output ONLY the commit message, nothing else."""
         return f"refactor: Implement strategic codebase improvements\n\nEnhanced system architecture to improve maintainability and operational excellence. This change aligns with industry best practices and positions the codebase for future scalability."
 
 
-def cleanup_git_lock():
-    """Remove stale git lock file if it exists."""
-    lock_file = ".git/index.lock"
-    if os.path.exists(lock_file):
-        try:
-            os.remove(lock_file)
-            print("🔧 Removed stale git lock file")
-        except Exception:
-            pass  # Ignore if we can't remove it
+def stage_changes() -> bool:
+    result = subprocess.run(["git", "add", "-A"], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if result.returncode != 0:
+        print(f"Failed to stage files: {result.stderr.strip()}")
+        return False
+    return True
 
 
 def commit(message: str) -> bool:
     """Stage all changes and commit."""
-    # Clean up any stale locks first
-    cleanup_git_lock()
+    if not stage_changes():
+        return False
     
-    subprocess.run(["git", "add", "-A"], capture_output=True)
     result = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode == 0:
         # Get the commit hash
@@ -326,9 +322,7 @@ def watch_mode(faang_mode: bool = False, cooldown: int = 30):
             print("🔍 Found existing changes, committing before starting watch...")
         
         # FIX: Stage files FIRST so untracked files appear in diff
-        subprocess.run(["git", "add", "-A"], capture_output=True)
-        
-        diff = get_staged_diff()
+        diff = get_staged_diff() if stage_changes() else ""
         if diff.strip():
             try:
                 message = generate_message(diff, faang_mode=faang_mode)
