@@ -14,6 +14,8 @@ import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+import mcp_server.server as server_module
+from mcp_server.git_utils import discover_git_target
 from mcp_server.server import handle_call_tool, handle_list_tools, start_watch_mode
 from mcp_server.workspace import InvalidWorkspaceError
 
@@ -189,6 +191,61 @@ async def test_stdio_commit_preserves_parent_with_core_worktree(git_repo, shared
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(("tool", "operation"), [
+    ("fckgit_status", "get_git_status"),
+    ("fckgit_commit_with_message", "stage_changes"),
+])
+async def test_project_move_after_validation_preserves_parent(git_repo, tmp_path, monkeypatch, tool, operation):
+    child = git_repo / "child"
+    git_output(git_repo, "init", str(child))
+    (child / "child.txt").touch()
+    marker = git_repo / "parent-marker.txt"
+    marker.write_text("staged")
+    git_output(git_repo, "add", marker.name)
+    marker.write_text("unstaged")
+    index = git_repo / ".git" / "index"
+    index_before = index.read_bytes()
+    head_before = git_output(git_repo, "rev-parse", "HEAD")
+    original = getattr(server_module, operation)
+
+    async def move_then_run(target):
+        child.rename(tmp_path / "moved")
+        child.mkdir()
+        return await original(target)
+
+    monkeypatch.setattr(server_module, operation, move_then_run)
+    with pytest.raises(RuntimeError, match="git"):
+        await call(tool, {"repo_path": str(child), "message": "Child change"})
+    assert git_output(git_repo, "rev-parse", "HEAD") == head_before
+    assert index.read_bytes() == index_before
+    assert marker.read_text() == "unstaged"
+
+
+@pytest.mark.asyncio
+async def test_push_retries_keep_linked_worktree_target(git_worktree, monkeypatch):
+    git_dir = Path(git_output(git_worktree, "rev-parse", "--absolute-git-dir"))
+    attempts = []
+    original = subprocess.run
+
+    def local_git(cmd, **kwargs):
+        if cmd[1] not in ("push", "pull"):
+            return original(cmd, **kwargs)
+        env = kwargs["env"]
+        attempts.append((cmd[1:], Path(env["GIT_DIR"]), Path(env["GIT_WORK_TREE"])))
+        if len(attempts) == 1:
+            raise subprocess.TimeoutExpired(cmd, 15)
+        if len(attempts) == 2:
+            return subprocess.CompletedProcess(cmd, 1, "", "rejected")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", local_git)
+    reply = await call("fckgit_push", {"repo_path": str(git_worktree)})
+    assert "pushed successfully" in reply
+    assert attempts == [(cmd, git_dir, git_worktree) for cmd in
+                        (["push"], ["push"], ["pull", "--rebase"], ["push"])]
+
+
+@pytest.mark.asyncio
 async def test_stdio_preserves_git_root_spelling(projects):
     first, second = projects
     # POSIX also allows whitespace at the end of a directory name.
@@ -301,6 +358,7 @@ async def test_watch_tools_match_command_and_worktree_root(projects, monkeypatch
     def process(pid, cwd, args, exe=sys.executable):
         proc = Mock(pid=pid)
         proc.info = {"pid": pid, "cwd": str(cwd), "exe": exe, "cmdline": [exe, *args]}
+        proc.environ.return_value = dict(os.environ)
         return proc
 
     other = process(11, first, ["-m", "fckgit"])
@@ -320,6 +378,25 @@ async def test_watch_tools_match_command_and_worktree_root(projects, monkeypatch
     watcher.terminate.assert_called_once_with()
 
 
+@pytest.mark.asyncio
+async def test_stop_leaves_external_watcher_for_another_git_target_running(projects, monkeypatch):
+    launch, target = projects
+    watcher = Mock(pid=22)
+    watcher.info = {"cwd": str(launch), "exe": sys.executable,
+                    "cmdline": [sys.executable, "-m", "fckgit"]}
+    watcher.environ.return_value = {**os.environ, "GIT_DIR": str(target / ".git"),
+                                    "GIT_WORK_TREE": str(target)}
+    monkeypatch.setattr("mcp_server.server.psutil.process_iter", lambda attrs: [watcher])
+    args = {"repo_path": str(launch), "pid": watcher.pid}
+    assert "No fckgit watch process" in await call("fckgit_stop_watch", args)
+    watcher.terminate.assert_not_called()
+    assert "is not running" in await call("fckgit_watch_status", {"repo_path": str(launch)})
+    assert "PID: 22" in await call("fckgit_watch_status", {"repo_path": str(target)})
+    watcher.environ.side_effect = server_module.psutil.AccessDenied(watcher.pid)
+    assert "No fckgit watch process" in await call("fckgit_stop_watch", {**args, "repo_path": str(target)})
+    watcher.terminate.assert_not_called()
+
+
 def test_watcher_commit_preserves_active_lock(git_repo):
     lock = git_repo / ".git" / "index.lock"
     lock.write_bytes(b"active writer")
@@ -333,7 +410,7 @@ def test_watcher_commit_preserves_active_lock(git_repo):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("options", [["-B"], ["-X", "utf8", "-u"], ["-Bu"]])
+@pytest.mark.parametrize("options", [["-B"], ["-X", "utf8", "-u"], ["-Bu"], ["-O"], ["-OO"]])
 async def test_live_module_watcher_lifecycle(git_repo, tmp_path, options):
     log = tmp_path / "watch.log"
     with log.open("wb") as output:
@@ -382,18 +459,25 @@ async def test_watcher_launch_uses_installed_cli_and_clean_git_env(projects, mon
     monkeypatch.setenv("GIT_DIR", str(first / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(first))
     monkeypatch.setattr("mcp_server.server.psutil.process_iter", lambda attrs: [])
+    target = discover_git_target(second)
     with monkeypatch.context() as launch:
         popen = Mock()
+        popen.return_value.pid = 22
+        popen.return_value.poll.return_value = None
         launch.setattr(subprocess, "Popen", popen)
+        launch.setattr(server_module, "_watch_processes", {})
         with pytest.raises(ValueError, match="cooldown"):
-            await start_watch_mode(second, cooldown=2.5)
+            await start_watch_mode(target, cooldown=2.5)
         popen.assert_not_called()
-        started, _, _ = await start_watch_mode(second, cooldown=2.0)
+        started, _, _ = await start_watch_mode(target, cooldown=2.0)
         assert started
+        running, message = await server_module.get_watch_status(target)
+        assert running and "PID: 22" in message
     (cmd,), kwargs = popen.call_args
     assert cmd[cmd.index("--cooldown") + 1] == "2"
     assert kwargs["cwd"] == second
     env = kwargs.get("env", os.environ)
-    assert "GIT_DIR" not in env and "GIT_WORK_TREE" not in env
+    assert Path(env["GIT_DIR"]) == second / ".git"
+    assert Path(env["GIT_WORK_TREE"]) == second
     help_text = subprocess.check_output([*cmd, "--help"], cwd=second, env=env, text=True)
     assert "--cooldown" in help_text

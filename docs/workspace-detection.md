@@ -32,11 +32,12 @@ priority order:
 4. `git rev-parse --show-toplevel` from cwd
 5. `Path.cwd()` fallback
 
-Git resolves a selected subdirectory to its worktree root. Each operation
-uses that path through completion, including any push retry. If moving
-to the root would select a different Git directory, the call returns an
-error before running the tool. This can happen when a nested repository
-sets `core.worktree` to its parent's worktree. If the editor
+Git resolves a selected subdirectory to its worktree root and Git directory.
+Each Git operation receives both absolute paths, including staging and push
+retries. If the child repository moves during the call, Git reports the
+missing Git directory. If the reported root belongs to a different Git
+directory, the call fails during discovery. This can happen when a nested
+repository sets `core.worktree` to its parent's worktree. If the editor
 keeps the server's original environment and working directory, pass the
 new project's absolute path as `repo_path`.
 

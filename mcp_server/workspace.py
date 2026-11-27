@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict
 
-from .git_utils import GitUtilsError, discover_worktree
+from .git_utils import GitTarget, GitUtilsError, discover_git_target
 
 
 class WorkspaceError(Exception):
@@ -37,7 +37,7 @@ class InvalidWorkspaceError(WorkspaceError):
 @dataclass
 class CacheEntry:
     """Cache entry with timestamp and hit tracking."""
-    value: Path
+    value: GitTarget
     timestamp: float
     hits: int = 0
 
@@ -66,18 +66,11 @@ class WorkspaceDetector:
         self._detection_method: Optional[str] = None
     
     def detect_workspace(self, override: Optional[str] = None) -> Path:
-        """
-        Detect workspace directory with comprehensive error handling.
-        
-        Args:
-            override: Optional path override (takes precedence)
-            
-        Returns:
-            Path to workspace directory
-            
-        Raises:
-            InvalidWorkspaceError: If workspace cannot be determined
-        """
+        workspace, _ = self.resolve_workspace(override)
+        return workspace
+
+    def resolve_workspace(self, override: Optional[str] = None) -> tuple[Path, Optional[GitTarget]]:
+        """Select the workspace and capture its repository for this call."""
         with self._lock:
             if override is not None:
                 selected = override
@@ -93,10 +86,11 @@ class WorkspaceDetector:
                 detection_method = "cwd_fallback"
 
             workspace = self._sanitize_path(selected)
+            target = None
             try:
-                root = self._use_git_command(workspace)
-                if root:
-                    workspace = root
+                target = self._use_git_command(workspace)
+                if target and target.worktree:
+                    workspace = target.worktree
                     if detection_method == "cwd_fallback":
                         detection_method = "git_rev_parse"
             except GitNotFoundError:
@@ -108,9 +102,9 @@ class WorkspaceDetector:
             self._detection_timestamp = time.time()
             self._detection_method = detection_method
             
-            return workspace
+            return workspace, target
     
-    def _use_git_command(self, cwd: Path) -> Optional[Path]:
+    def _use_git_command(self, cwd: Path) -> Optional[GitTarget]:
         """
         Use git command to find repository root.
         
@@ -121,7 +115,7 @@ class WorkspaceDetector:
             cwd: Current working directory to start from
             
         Returns:
-            Path to git repository root, or None if not found
+            Git directory and optional worktree, or None if not found
             
         Raises:
             GitNotFoundError: If git command is not available
@@ -140,15 +134,16 @@ class WorkspaceDetector:
                 del self._cache[cache_key]
         
         try:
-            root = discover_worktree(cwd)
-            if root is not None:
-                sanitized = self._sanitize_path(str(root))
+            target = discover_git_target(cwd)
+            if target is not None:
+                if target.worktree:
+                    self._sanitize_path(str(target.worktree))
                 self._cache[cache_key] = CacheEntry(
-                    value=sanitized,
+                    value=target,
                     timestamp=time.time(),
                     hits=1
                 )
-                return sanitized
+                return target
             
             return None
             

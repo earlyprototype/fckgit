@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- MCP commands and retries use the Git directory and worktree selected for the call.
+- MCP Git operations honor signing and push settings from command-level config includes.
+- Watcher status and stop verify the target repository and recognize `python -O` and `python -OO` module launches.
+
 ## [0.2.2] - 2026-01-06
 
 ### Added

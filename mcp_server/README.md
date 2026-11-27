@@ -47,10 +47,15 @@ The detector resolves symlinks and checks that the selected path is an existing 
 - `check_git_available()`: Verify git command availability
 - `get_git_version()`: Get git version for debugging
 
-Git subprocesses discard inherited repository, worktree, and index selectors.
-The server filters command-level worktree redirects and config includes from
-`GIT_CONFIG_PARAMETERS` and numbered `GIT_CONFIG_COUNT` entries. Other entries
-retain their order, including signing, push, credential, and identity settings.
+Each Git subprocess receives the validated Git directory and worktree.
+Discovery discards inherited repository and index selectors and ignores
+command-level worktree redirects. After discovery, Git evaluates command-level
+config includes against the selected repository, preserving signing and push policy.
+
+The server records the target of each watcher it starts. For an external
+watcher, it checks the process environment and asks Git for the effective
+Git directory and worktree. Status and stop skip a watcher if its environment
+is inaccessible or its Git context cannot be verified.
 
 ### 3. Platform Utilities (`platform_utils.py`)
 
