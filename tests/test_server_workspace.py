@@ -3,6 +3,7 @@
 import asyncio
 import ast
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -13,6 +14,7 @@ from unittest.mock import Mock
 import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.shared.memory import create_connected_server_and_client_session
 
 import mcp_server.server as server_module
 from mcp_server.git_utils import discover_git_target
@@ -219,6 +221,81 @@ async def test_project_move_after_validation_preserves_parent(git_repo, tmp_path
     assert git_output(git_repo, "rev-parse", "HEAD") == head_before
     assert index.read_bytes() == index_before
     assert marker.read_text() == "unstaged"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("layout", ["core.worktree", "linked"])
+async def test_replaced_checkout_blocks_staging(git_repo, monkeypatch, layout):
+    child = git_repo / "child"
+    if layout == "linked":
+        git_output(git_repo, "worktree", "add", "--detach", str(child))
+        checkout = child
+    else:
+        git_output(git_repo, "init", str(child))
+        git_output(child, "config", "user.name", "Test User")
+        git_output(child, "config", "user.email", "test@example.com")
+        checkout = child / "checkout"
+        checkout.mkdir()
+        git_output(child, "config", "core.worktree", str(checkout))
+        (checkout / "tracked.txt").write_text("child content")
+        git_output(checkout, "add", "tracked.txt")
+        git_output(checkout, "commit", "-m", "Child baseline")
+
+    child_dir = Path(git_output(child, "rev-parse", "--absolute-git-dir"))
+    child_head = git_output(child, "rev-parse", "HEAD")
+    child_index = (child_dir / "index").read_bytes()
+    parent_file = git_repo / "README.md"
+    parent_file.write_text("staged parent edit")
+    git_output(git_repo, "add", parent_file.name)
+    parent_file.write_text("unstaged parent edit")
+    parent_index = (git_repo / ".git" / "index").read_bytes()
+    parent_head = git_output(git_repo, "rev-parse", "HEAD")
+    stage = server_module.stage_changes
+
+    async def move_before_staging(target):
+        checkout.rename(checkout.with_name("moved"))
+        checkout.mkdir()
+        await stage(target)
+
+    monkeypatch.setattr(server_module, "stage_changes", move_before_staging)
+    async with create_connected_server_and_client_session(server_module.server) as session:
+        result = await session.call_tool("fckgit_commit_with_message", {
+            "repo_path": str(child), "message": "Child change",
+        })
+    assert result.isError, result.content
+    assert not any(checkout.iterdir())
+    assert git_output(git_repo, "--git-dir", str(child_dir), "rev-parse", "HEAD") == child_head
+    assert (child_dir / "index").read_bytes() == child_index
+    assert git_output(git_repo, "rev-parse", "HEAD") == parent_head
+    assert (git_repo / ".git" / "index").read_bytes() == parent_index
+    assert parent_file.read_text() == "unstaged parent edit"
+
+
+@pytest.mark.asyncio
+async def test_replaced_git_directory_blocks_staging_retry(git_repo, tmp_path, monkeypatch):
+    git_dir = git_repo / ".git"
+    (git_repo / "README.md").write_text("pending change")
+    head = git_output(git_repo, "rev-parse", "HEAD")
+    index = (git_dir / "index").read_bytes()
+    original = subprocess.run
+    moved = tmp_path / "original.git"
+
+    def timeout_once(cmd, **kwargs):
+        if cmd == ["git", "add", "-A"] and not moved.exists():
+            git_dir.rename(moved)
+            shutil.copytree(moved, git_dir)
+            raise subprocess.TimeoutExpired(cmd, 15)
+        return original(cmd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", timeout_once)
+    async with create_connected_server_and_client_session(server_module.server) as session:
+        result = await session.call_tool("fckgit_commit_with_message", {
+            "repo_path": str(git_repo), "message": "Pending change",
+        })
+    assert result.isError, result.content
+    for directory in (git_dir, moved):
+        assert git_output(git_repo, "--git-dir", str(directory), "rev-parse", "HEAD") == head
+        assert (directory / "index").read_bytes() == index
 
 
 @pytest.mark.asyncio
@@ -441,6 +518,36 @@ async def test_live_module_watcher_lifecycle(git_repo, tmp_path, options):
         if watcher.poll() is None:
             watcher.terminate()
             watcher.wait(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_server_watcher_after_restart_with_numbered_config(git_repo, monkeypatch):
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "push.default")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "nothing")
+    registry = {}
+    monkeypatch.setattr(server_module, "_watch_processes", registry)
+    args = {"repo_path": str(git_repo)}
+    assert "BLASTOFF!" in await call("fckgit_blastoff", args)
+    watcher, = registry.values()
+    registry.clear()
+    try:
+        assert watcher.poll() is None
+        status = await call("fckgit_watch_status", args)
+        assert "is running (PID:" in status, status
+        assert "already running" in await call("fckgit_blastoff", args)
+        assert not registry
+        with monkeypatch.context() as different_config:
+            different_config.setenv("GIT_CONFIG_VALUE_0", "current")
+            assert "No fckgit watch process" in await call("fckgit_stop_watch", args)
+        assert "Stopped" in await call("fckgit_stop_watch", {**args, "pid": watcher.pid})
+        watcher.wait(timeout=5)
+        assert "is not running" in await call("fckgit_watch_status", args)
+    finally:
+        for process in (watcher, *registry.values()):
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
 
 
 @pytest.mark.asyncio

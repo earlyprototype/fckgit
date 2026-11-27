@@ -30,7 +30,7 @@ import mcp.server.stdio
 # Import our new modules
 from .workspace import InvalidWorkspaceError, WorkspaceDetector
 from .git_utils import (
-    GitTarget, decode_git_path, detect_git_repo_type, external_watcher_target,
+    GitTarget, GitUtilsError, decode_git_path, detect_git_repo_type, external_watcher_target,
 )
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
@@ -110,7 +110,6 @@ async def run_git_command(
     # Get platform-specific subprocess kwargs
     kwargs = get_subprocess_kwargs(is_background=False, timeout=timeout)
     kwargs['cwd'] = str(target.cwd)
-    kwargs['env'] = target.environment()
     
     # Log command execution (without sensitive data)
     cmd_str = ' '.join(cmd)
@@ -125,7 +124,7 @@ async def run_git_command(
             # Run command asynchronously
             result = await loop.run_in_executor(
                 None,
-                lambda: subprocess.run(cmd, **kwargs)
+                lambda: subprocess.run(cmd, env=target.environment(), **kwargs)
             )
             
             duration = time.time() - start_time
@@ -145,6 +144,8 @@ async def run_git_command(
                 command=cmd_str
             )
             
+        except GitUtilsError:
+            raise
         except subprocess.TimeoutExpired as e:
             last_error = f"Command timed out after {timeout}s"
             logger.warning(
@@ -300,6 +301,7 @@ async def cleanup_git_lock(target: GitTarget) -> bool:
     result = await asyncio.to_thread(target.rev_parse, "--git-path", "index.lock")
     result.check_returncode()
     lock_file = target.cwd / decode_git_path(result.stdout)
+    target.verify()
     if lock_file.exists():
         try:
             lock_file.unlink()
@@ -430,6 +432,7 @@ async def start_watch_mode(target: GitTarget, cooldown: int | float = 30, faang_
     
     for proc, watcher_target in find_fckgit_processes():
         if watcher_target == target:
+            target.verify()
             return False, f"fckgit watch already running (PID: {proc.pid})", proc.pid
     
     # Build command with cooldown and faang mode
@@ -453,6 +456,8 @@ async def start_watch_mode(target: GitTarget, cooldown: int | float = 30, faang_
         _watch_processes[target] = process
         
         return True, f"fckgit watch mode started (PID: {process.pid})", process.pid
+    except GitUtilsError:
+        raise
     except Exception as e:
         return False, f"Failed to start watch mode: {str(e)}", None
 
@@ -463,6 +468,7 @@ async def stop_watch_mode(target: GitTarget, pid: Optional[int] = None) -> tuple
     for proc, watcher_target in find_fckgit_processes():
         if watcher_target != target or (pid is not None and proc.pid != pid):
             continue
+        target.verify()
         try:
             proc.terminate()
             try:
@@ -480,6 +486,7 @@ async def get_watch_status(target: GitTarget) -> tuple[bool, str]:
     """Check if fckgit watch is running in current repo."""
     for proc, watcher_target in find_fckgit_processes():
         if watcher_target == target:
+            target.verify()
             return True, f"fckgit watch is running (PID: {proc.pid})"
     
     return False, "fckgit watch is not running"

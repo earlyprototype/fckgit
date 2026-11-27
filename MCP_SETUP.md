@@ -209,8 +209,10 @@ takes precedence over `PROJECT_ROOT`. An inaccessible configured folder
 produces a tool error. Correct the setting and restart the server to load
 it. With both settings absent, the server discovers Git from its working
 directory. Git respects discovery limits such as `GIT_CEILING_DIRECTORIES`.
-Each call uses the selected Git directory and worktree for every command and
-retry. If a project moves during a call, pass its new path on the next call.
+Before each Git command or retry, the server checks that the Git directory
+and worktree still have the filesystem identities recorded for the call.
+If either path was moved or replaced, the tool returns an error. Pass the
+project's current path on the next call.
 
 ### Problem: "GEMINI_API_KEY not set"
 

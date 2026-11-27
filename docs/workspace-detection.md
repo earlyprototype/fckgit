@@ -33,19 +33,18 @@ priority order:
 5. `Path.cwd()` fallback
 
 Git resolves a selected subdirectory to its worktree root and Git directory.
-Each Git operation receives both absolute paths, including staging and push
-retries. If the child repository moves during the call, Git reports the
-missing Git directory. If the reported root belongs to a different Git
-directory, the call fails during discovery. This can happen when a nested
-repository sets `core.worktree` to its parent's worktree. If the editor
-keeps the server's original environment and working directory, pass the
-new project's absolute path as `repo_path`.
+If the reported root selects a different Git directory, discovery fails.
+This can happen when a nested repository sets `core.worktree` to its
+parent's worktree. The server records the device and file ID of each
+selected directory and checks them before each Git command and retry.
+A new directory at the old checkout path fails this check.
+
+If the editor keeps the server's original environment and working directory,
+pass the new project's absolute path as `repo_path`.
 
 ## Dead End: The MCP Roots Protocol
 
-The obvious "proper" fix looked like the MCP roots protocol — but
-inspecting the Python SDK showed `roots/list` is a request the **server
-sends to the client**, not something the server implements:
+In the Python SDK, the server sends a `roots/list` request to the client.
 
 ```python
 # mcp/server/session.py

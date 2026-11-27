@@ -9,8 +9,9 @@ Provides support for:
 """
 
 import os
+import stat
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -93,9 +94,19 @@ class GitRepoInfo:
     superproject_root: Optional[Path] = None
 
 
-class GitUtilsError(Exception):
+class GitUtilsError(RuntimeError):
     """Base exception for git utilities errors."""
     pass
+
+
+def _directory_id(path: Path) -> tuple[int, int]:
+    try:
+        info = path.stat()
+    except OSError as exc:
+        raise GitUtilsError(f"Cannot verify directory for git operation: {path}") from exc
+    if not stat.S_ISDIR(info.st_mode) or not info.st_ino:
+        raise GitUtilsError(f"Cannot identify directory for git operation: {path}")
+    return info.st_dev, info.st_ino
 
 
 @dataclass(frozen=True)
@@ -103,10 +114,21 @@ class GitTarget:
     """The absolute Git directory and optional working tree selected together."""
     git_dir: Path
     worktree: Optional[Path]
+    _identities: tuple[tuple[Path, tuple[int, int]], ...] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        paths = (self.git_dir,) if self.worktree is None else (self.git_dir, self.worktree)
+        object.__setattr__(self, "_identities", tuple((path, _directory_id(path)) for path in paths))
 
     @property
     def cwd(self) -> Path:
         return self.worktree or self.git_dir
+
+    def verify(self) -> None:
+        """Check that each selected path still names the original directory."""
+        for path, identity in self._identities:
+            if _directory_id(path) != identity:
+                raise GitUtilsError(f"Directory replaced during git operation: {path}")
 
     def environment(self) -> dict[str, str]:
         env = git_environment()
@@ -115,6 +137,7 @@ class GitTarget:
             env["GIT_IMPLICIT_WORK_TREE"] = "0"
         else:
             env["GIT_WORK_TREE"] = str(self.worktree)
+        self.verify()
         return env
 
     def rev_parse(self, *args: str) -> subprocess.CompletedProcess:
@@ -167,9 +190,15 @@ def external_watcher_target(cwd: Path, process_env: dict[str, str]) -> Optional[
     def context(env):
         return {k: v for k, v in env.items() if k in context_keys or k.startswith("GIT_CONFIG_")}
 
-    if context(process_env) != context(os.environ):
-        return None
     env = {key: value for key, value in os.environ.items() if key not in _REPO_ENV}
+    watcher_context = context(process_env)
+    if watcher_context != context(env):
+        # Server-launched watchers receive both selectors and normalized command config.
+        if not selectors.issubset(process_env):
+            return None
+        env = git_environment()
+        if watcher_context != context(env):
+            return None
     for key in selectors:
         if key in process_env:
             env[key] = process_env[key]

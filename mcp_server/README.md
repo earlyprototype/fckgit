@@ -54,8 +54,10 @@ config includes against the selected repository, preserving signing and push pol
 
 The server records the target of each watcher it starts. For an external
 watcher, it checks the process environment and asks Git for the effective
-Git directory and worktree. Status and stop skip a watcher if its environment
-is inaccessible or its Git context cannot be verified.
+Git directory and worktree. After a restart, discovery also recognizes the
+command configuration the server passed to the watcher at launch. Status
+and stop skip a watcher if its environment is inaccessible or its Git
+context cannot be verified.
 
 ### 3. Platform Utilities (`platform_utils.py`)
 

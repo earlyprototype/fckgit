@@ -4,9 +4,10 @@
 
 ### Fixed
 
-- MCP commands and retries use the Git directory and worktree selected for the call.
+- MCP commands and retries check the filesystem identity of the selected Git directory and worktree. Replacing either directory stops the call.
 - MCP Git operations honor signing and push settings from command-level config includes.
 - Watcher status and stop verify the target repository and recognize `python -O` and `python -OO` module launches.
+- After a server restart, watcher status, blastoff, and stop recognize running watchers launched with numbered Git config settings.
 
 ## [0.2.2] - 2026-01-06
 
