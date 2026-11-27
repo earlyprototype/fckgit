@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- MCP rejects a checkout switch during repository discovery before staging files.
+- Concurrent `fckgit_blastoff` calls start one watcher per checkout. Status and stop recognize a server-owned watcher after its checkout is renamed.
 - MCP holds the selected Git directory and worktree open while Git runs. A checkout move during command startup can no longer stage files from a replacement directory.
 - MCP accepts a repository whose `core.worktree` points to a separate checkout outside any repository. It rejects a checkout owned by a different repository.
 - MCP Git operations honor signing and push settings from command-level config includes.

@@ -52,6 +52,7 @@ server = Server("fckgit")
 
 # Track running watch processes
 _watch_processes: dict[GitTarget, subprocess.Popen] = {}
+_starting_watches: set[GitTarget] = set()
 _WATCH_SCRIPT = Path(__file__).resolve().parent.parent / "fckgit.py"
 _CONSOLE_SCRIPT = Path(sysconfig.get_path("scripts")) / ("fckgit.exe" if os.name == "nt" else "fckgit")
 
@@ -428,7 +429,11 @@ async def start_watch_mode(target: GitTarget, cooldown: int | float = 30, faang_
         cooldown = int(cooldown)
     if type(cooldown) is not int:
         raise ValueError("cooldown must be an integer number of seconds")
-    
+
+    if target in _starting_watches:
+        target.verify()
+        return False, "fckgit watch is already starting for this repository", None
+
     for proc, watcher_target in find_fckgit_processes():
         if watcher_target == target:
             target.verify()
@@ -439,7 +444,10 @@ async def start_watch_mode(target: GitTarget, cooldown: int | float = 30, faang_
     cmd = [sys.executable, "-E", str(_WATCH_SCRIPT), "--cooldown", str(cooldown)]
     if faang_mode:
         cmd.append("--faang")
-    
+
+    # MCP handlers share the event loop. Reserve before spawning or awaiting
+    # the helper, and keep the reservation until the live handle is registered.
+    _starting_watches.add(target)
     try:
         if sys.platform == 'win32':
             launch_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW}
@@ -473,6 +481,8 @@ async def start_watch_mode(target: GitTarget, cooldown: int | float = 30, faang_
         raise
     except Exception as e:
         return False, f"Failed to start watch mode: {str(e)}", None
+    finally:
+        _starting_watches.remove(target)
 
 
 async def stop_watch_mode(target: GitTarget, pid: Optional[int] = None) -> tuple[bool, str]:

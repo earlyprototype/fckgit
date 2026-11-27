@@ -85,6 +85,13 @@ def test_include_cannot_attach_a_worktree_to_metadata(git_repo, tmp_path, monkey
     assert target.rev_parse("--show-toplevel").returncode != 0
 
 
+def test_traced_discovery_preserves_bare_target(bare_repo, monkeypatch):
+    monkeypatch.setenv("GIT_TRACE", "1")
+    target = discover_git_target(bare_repo)
+    assert target.git_dir == bare_repo
+    assert target.worktree is None
+
+
 @pytest.mark.skipif(os.name == "nt", reason="Windows holds the checkout against rename during staging")
 def test_move_during_git_add_discards_pending_index(git_repo, monkeypatch):
     checkout = git_repo / "checkout"

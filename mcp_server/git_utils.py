@@ -150,14 +150,17 @@ def _pin_directory(path: Path, stack: ExitStack) -> tuple[Path, int]:
 
 @dataclass(frozen=True)
 class GitTarget:
-    """The absolute Git directory and optional working tree selected together."""
-    git_dir: Path
-    worktree: Optional[Path]
-    _identities: tuple[tuple[Path, tuple[int, int]], ...] = field(init=False, repr=False)
+    """A Git directory and optional worktree, compared by filesystem identity."""
+    git_dir: Path = field(compare=False)
+    worktree: Optional[Path] = field(compare=False)
+    _identities: tuple[tuple[int, int], ...] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        paths = (self.git_dir,) if self.worktree is None else (self.git_dir, self.worktree)
-        object.__setattr__(self, "_identities", tuple((path, _directory_id(path)) for path in paths))
+        object.__setattr__(self, "_identities", tuple(_directory_id(path) for path in self._paths))
+
+    @property
+    def _paths(self) -> tuple[Path, ...]:
+        return (self.git_dir,) if self.worktree is None else (self.git_dir, self.worktree)
 
     @property
     def cwd(self) -> Path:
@@ -165,7 +168,7 @@ class GitTarget:
 
     def verify(self) -> None:
         """Check that each selected path still names the original directory."""
-        for path, identity in self._identities:
+        for path, identity in zip(self._paths, self._identities):
             if _directory_id(path) != identity:
                 raise GitUtilsError(f"Directory replaced during git operation: {path}")
 
@@ -187,7 +190,7 @@ class GitTarget:
             anchors = {}
             handles = []
             try:
-                for path, identity in self._identities:
+                for path, identity in zip(self._paths, self._identities):
                     anchor, handle = _pin_directory(path, stack)
                     if _directory_id(anchor) != identity:
                         raise GitUtilsError(f"Directory replaced during git operation: {path}")
@@ -255,31 +258,47 @@ class GitTarget:
 
 
 def _read_git_target(path: Path, env: dict[str, str]) -> Optional[GitTarget]:
+    start_id = _directory_id(path)
     result = rev_parse(path, "--absolute-git-dir", env=env)
     if result.returncode:
         return None
     git_dir = Path(decode_git_path(result.stdout)).resolve()
-    top = rev_parse(path, "--show-toplevel", env=env)
-    worktree = None if top.returncode else Path(decode_git_path(top.stdout)).resolve()
-    return GitTarget(git_dir, worktree)
+    git_dir_id = _directory_id(git_dir)
+    # Ask one Git process for both paths. The first probe supplies the exact
+    # record boundary because Git permits newlines in either directory name.
+    pair = rev_parse(path, "--absolute-git-dir", "--show-toplevel", env={**env, "LC_ALL": "C"})
+    if not pair.stdout.startswith(result.stdout):
+        raise GitUtilsError(f"Git directory changed during discovery at {path}")
+    if pair.returncode:
+        no_worktree = b"fatal: this operation must be run in a work tree" in pair.stderr.splitlines()
+        if pair.stdout != result.stdout or not no_worktree:
+            raise GitUtilsError(f"Cannot verify worktree for Git directory at {git_dir}")
+        worktree = None
+    else:
+        worktree = Path(decode_git_path(pair.stdout[len(result.stdout):])).resolve()
+    target = GitTarget(git_dir, worktree)
+    if _directory_id(path) != start_id or _directory_id(git_dir) != git_dir_id:
+        raise GitUtilsError(f"Directory replaced during git discovery at {path}")
+    return target
 
 
 def discover_git_target(path: Path) -> Optional[GitTarget]:
     """Validate the worktree and retain the Git directory selected at the original path."""
     env = git_environment(discovery=True)
     target = _read_git_target(path, env)
-    if target and target.worktree and target.worktree != path:
+    if target and target.worktree:
         at_root = rev_parse(target.worktree, "--absolute-git-dir", env={**env, "LC_ALL": "C"})
         if at_root.returncode:
             # An external core.worktree can have no .git entry or enclosing
             # repository. Other discovery errors leave its ownership unknown.
-            if not at_root.stderr.startswith(b"fatal: not a git repository (or any "):
+            if target.worktree == path or not at_root.stderr.startswith(b"fatal: not a git repository (or any "):
                 raise GitUtilsError(f"Cannot verify Git directory at {target.worktree}")
             configured = rev_parse(target.git_dir, "--show-toplevel", env={**env, "GIT_DIR": str(target.git_dir)})
             if configured.returncode or Path(decode_git_path(configured.stdout)).resolve() != target.worktree:
                 raise GitUtilsError(f"Git directory at {target.git_dir} does not select {target.worktree}")
         elif Path(decode_git_path(at_root.stdout)).resolve() != target.git_dir:
             raise GitUtilsError(f"Worktree at {target.worktree} does not select the Git directory for {path}")
+        target.verify()
     return target
 
 

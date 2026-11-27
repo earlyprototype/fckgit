@@ -218,6 +218,10 @@ The server checks the identity of both directories on each command and retry
 and holds them open while Git runs. If a move interrupts the call, pass the
 project's current path on the next call.
 
+Overlapping `fckgit_blastoff` calls for the same checkout start one watcher.
+After renaming a watched checkout on POSIX, pass its new path to
+`fckgit_watch_status` or `fckgit_stop_watch`.
+
 ### Problem: "GEMINI_API_KEY not set"
 
 **Solution:**

@@ -7,8 +7,9 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -17,6 +18,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.shared.memory import create_connected_server_and_client_session
 
+import mcp_server.git_utils as git_utils
 import mcp_server.server as server_module
 from mcp_server.git_utils import discover_git_target
 from mcp_server.server import handle_call_tool, handle_list_tools, start_watch_mode
@@ -305,6 +307,49 @@ async def test_replaced_checkout_blocks_staging(git_repo, monkeypatch, layout, w
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("switch", ["replace-checkout", "repoint-gitfile"])
+async def test_switch_during_discovery_preserves_both_indexes(git_repo, monkeypatch, switch):
+    checkout = git_repo / "selected"
+    replacement = git_repo / "replacement"
+    for path in (checkout, replacement):
+        git_output(git_repo, "worktree", "add", "--detach", str(path))
+        (path / "README.md").write_text(path.name)
+        git_output(path, "add", "README.md")
+    (replacement / "pending.txt").write_text("replacement change")
+    indexes = [Path(git_output(p, "rev-parse", "--absolute-git-dir")) / "index"
+               for p in (checkout, replacement)]
+    before = [index.read_bytes() for index in indexes]
+    switched = False
+    trigger = "--absolute-git-dir" if switch == "replace-checkout" else "--show-toplevel"
+    rev_parse = git_utils.rev_parse
+
+    def switch_after_probe(path, *args, **kwargs):
+        nonlocal switched
+        result = rev_parse(path, *args, **kwargs)
+        if switched or path != checkout or trigger not in args:
+            return result
+        if switch == "replace-checkout":
+            checkout.rename(git_repo / "moved")
+            replacement.rename(checkout)
+        else:
+            with (checkout / ".git").open("r+b") as gitfile:
+                gitfile.write((replacement / ".git").read_bytes())
+                gitfile.truncate()
+        switched = True
+        return result
+
+    monkeypatch.setattr(git_utils, "rev_parse", switch_after_probe)
+    async with create_connected_server_and_client_session(server_module.server) as session:
+        result = await session.call_tool("fckgit_commit_with_message", {
+            "repo_path": str(checkout), "message": "Switched during discovery",
+        })
+    assert switched
+    assert [index.read_bytes() for index in indexes] == before
+    assert result.isError, result.content
+    assert "director" in result.content[0].text.lower(), result.content
+
+
+@pytest.mark.asyncio
 async def test_git_directory_replacement_at_launch_preserves_both_indexes(git_repo, tmp_path, monkeypatch):
     git_dir = git_repo / ".git"
     moved = tmp_path / "moved.git"
@@ -534,6 +579,84 @@ async def test_watch_tools_match_command_and_worktree_root(projects, monkeypatch
     for proc in (other, unrelated, once, non_python):
         assert "No fckgit watch process" in await call("fckgit_stop_watch", {**args, "pid": proc.pid})
         proc.terminate.assert_not_called()
+    assert "Stopped" in await call("fckgit_stop_watch", {**args, "pid": watcher.pid})
+    watcher.terminate.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("startup_error", [b"", b"helper failed"])
+async def test_overlapping_blastoff_launches_one_watcher(git_repo, monkeypatch, startup_error):
+    spawned = asyncio.Event()
+    release = threading.Event()
+    launches = []
+    command_context = git_utils.GitTarget.command_context
+    popen = subprocess.Popen
+
+    @contextmanager
+    def with_helper(target, *, watcher=False):
+        if watcher:
+            yield ["simulated-helper"], {}
+        else:
+            with command_context(target) as context:
+                yield context
+
+    def read_startup():
+        assert release.wait(15)
+        return startup_error
+
+    def launch(cmd, **kwargs):
+        if cmd[0] != "simulated-helper":
+            return popen(cmd, **kwargs)
+        process = Mock(pid=200 + len(launches))
+        process.poll.return_value = None
+        process.stderr.read.side_effect = read_startup if not launches else lambda: b""
+        launches.append(process)
+        spawned.set()
+        return process
+
+    monkeypatch.setattr(git_utils.GitTarget, "command_context", with_helper)
+    monkeypatch.setattr(subprocess, "Popen", launch)
+    monkeypatch.setattr(server_module.psutil, "process_iter", lambda attrs: [])
+    monkeypatch.setattr(server_module, "_watch_processes", {})
+    args = {"repo_path": str(git_repo)}
+    async with create_connected_server_and_client_session(server_module.server) as session:
+        first = asyncio.create_task(session.call_tool("fckgit_blastoff", args))
+        try:
+            await asyncio.wait_for(spawned.wait(), timeout=10)
+            second = await session.call_tool("fckgit_blastoff", args)
+        finally:
+            release.set()
+            result = await first
+        assert len(launches) == 1
+        assert "starting" in second.content[0].text
+        if startup_error:
+            assert result.isError and "helper failed" in result.content[0].text
+            retry = await session.call_tool("fckgit_blastoff", args)
+            assert "BLASTOFF!" in retry.content[0].text and len(launches) == 2
+        else:
+            assert "BLASTOFF!" in result.content[0].text
+        assert f"PID: {launches[-1].pid}" in await call("fckgit_watch_status", args)
+
+
+@pytest.mark.asyncio
+async def test_owned_watcher_follows_renamed_checkout(git_repo, monkeypatch):
+    original = git_repo / "original"
+    git_output(git_repo, "init", str(original))
+    target = discover_git_target(original)
+    watcher = Mock(pid=22)
+    watcher.poll.return_value = None
+    monkeypatch.setattr(server_module, "_watch_processes", {target: watcher})
+    monkeypatch.setattr(server_module.psutil, "process_iter", lambda attrs: [])
+
+    moved = original.rename(git_repo / "moved")
+    git_output(git_repo, "init", str(original))
+    old_args = {"repo_path": str(original)}
+    assert "is not running" in await call("fckgit_watch_status", old_args)
+    assert "No fckgit watch process" in await call("fckgit_stop_watch", {**old_args, "pid": watcher.pid})
+    watcher.terminate.assert_not_called()
+    args = {"repo_path": str(moved)}
+    assert "PID: 22" in await call("fckgit_watch_status", args)
+    assert "already running (PID: 22)" in await call("fckgit_blastoff", args)
     assert "Stopped" in await call("fckgit_stop_watch", {**args, "pid": watcher.pid})
     watcher.terminate.assert_called_once_with()
 
