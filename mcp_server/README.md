@@ -12,20 +12,21 @@ The fckgit MCP server provides AI-powered git operations through the Model Conte
 
 **Key Features**:
 - Thread-safe workspace detection with locking
-- LRU cache with configurable TTL (default: 60s)
+- Directory-keyed cache for repeated Git root lookups within one detector
 - Multiple detection strategies with fallback
 - Security validation (path traversal, permissions)
 - Support for complex git configurations
 
 **Detection Strategy**:
-1. WORKSPACE_FOLDER_PATHS environment variable (automatic - provided by Cursor/VSCode)
-2. PROJECT_ROOT environment variable (manual override)
-3. Git command (`git rev-parse --show-toplevel`)
-4. Current working directory (fallback)
+
+1. Optional `repo_path` argument on the tool call
+2. First directory in `WORKSPACE_FOLDER_PATHS`
+3. `PROJECT_ROOT` environment variable
+4. Git root from the server's current working directory, or that directory itself
 
 **Why this approach?**
 
-**Auto-Detection for Modern IDEs:** Cursor and VSCode automatically provide the workspace path via the `WORKSPACE_FOLDER_PATHS` environment variable. This means the MCP server automatically works with the current project without any configuration!
+Each call reads the workspace settings visible to the server. An editor that keeps the server environment fixed can pass `repo_path` when the active project changes.
 
 **Manual Configuration for Others:** For IDEs/clients that don't provide workspace info (Claude Desktop, JetBrains, Neovim, etc.), users set `cwd` in the MCP config, and the server uses `git rev-parse --show-toplevel` to find the actual git root.
 
@@ -138,19 +139,9 @@ async def run_git_command(
 
 ### Caching Strategy
 
-1. **Workspace Detection Cache**:
-   - TTL: 60 seconds (configurable)
-   - Thread-safe with RLock
-   - Tracks cache hits for monitoring
-
-2. **When to Invalidate**:
-   - After 60 seconds (TTL)
-   - On explicit errors (repo moved/deleted)
-   - Manual invalidation via `invalidate_cache()`
-
-3. **Cache Effectiveness**:
-   - First call: ~50ms (git command execution)
-   - Cached calls: <1ms (memory lookup)
+Each MCP call creates its own workspace detector. All steps in that call
+reuse the resolved directory. The detector's Git root cache lasts for the
+life of the detector and supports a configurable TTL for repeated lookups.
 
 ### Git Command Optimization
 
@@ -223,20 +214,13 @@ def _sanitize_path(self, path: str) -> Path:
 
 ## Known Limitations
 
-1. **One workspace per MCP server instance**: Can't dynamically switch between projects
-   - **Workaround**: Configure multiple MCP server instances with different working directories
-
-2. **Requires git command available**: Won't work without git in PATH
-   - **Workaround**: Install git or set PATH appropriately
-
-3. **Cache may become stale**: If repository is moved/deleted while server running
-   - **Workaround**: Restart MCP server or invalidate cache
+Git must be available on the server's PATH.
 
 ## Configuration
 
 ### Environment Variables
 
-- `PROJECT_ROOT`: Override workspace detection (highest priority)
+- `PROJECT_ROOT` supplies the default directory when `WORKSPACE_FOLDER_PATHS` is unset.
 - `GEMINI_API_KEY`: Required for AI commit messages
 - `LOG_LEVEL`: Set logging level (DEBUG, INFO, WARNING, ERROR)
 
@@ -283,17 +267,14 @@ def _sanitize_path(self, path: str) -> Path:
 **Symptom**: Slow git operations
 
 **Solution**:
-1. Check cache hit rate via `fckgit_debug`
-2. Increase cache TTL if appropriate
-3. Check network drive latency (if applicable)
+Check network drive latency when the repository is on a shared drive.
 
 ## Future Improvements
 
-1. **Dynamic workspace switching**: Accept workspace path in tool calls
-2. **Workspace metadata caching**: Cache more git metadata
-3. **Background refresh**: Refresh cache before expiry
-4. **Metrics collection**: Track performance and cache effectiveness
-5. **Custom git command timeout**: Per-command timeout configuration
+1. **Workspace metadata caching**: Cache more git metadata
+2. **Background refresh**: Refresh cache before expiry
+3. **Metrics collection**: Track performance and cache effectiveness
+4. **Custom git command timeout**: Per-command timeout configuration
 
 ## Contributing
 

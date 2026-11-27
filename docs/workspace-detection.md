@@ -1,19 +1,16 @@
-# Case Study: Why the MCP Server Sometimes Commits the Wrong Repo
+# Case Study: Why the MCP Server Kept Using the First Repository
 
-**Status: known limitation.** Workspace is detected once at server startup
-(`mcp_server/server.py`, module scope). The `fckgit_debug` tool exposes the
-mismatch; per-request re-detection is the planned fix and has not shipped yet.
+The server now resolves the repository at the start of each MCP tool call.
 
 ## Symptom
 
-fckgit's MCP server sometimes doesn't see changes in the project you're
-working on. It looks like the server is stuck pointing at whichever
-directory it started in.
+After a project switch, status and commit operations still used the
+repository the server had detected at startup.
 
 ## Root Cause
 
 ```python
-# mcp_server/server.py — module scope, runs once per process
+# Previous startup code in mcp_server/server.py
 _workspace_path = _workspace_detector.detect_workspace()
 ```
 
@@ -29,14 +26,16 @@ The MCP server is a long-running process:
 `WorkspaceDetector` (`mcp_server/workspace.py`) resolves the workspace in
 priority order:
 
-1. `override` parameter (manual)
+1. `repo_path` tool argument
 2. `WORKSPACE_FOLDER_PATHS` (Cursor/VSCode)
 3. `PROJECT_ROOT` (manual config)
 4. `git rev-parse --show-toplevel` from cwd
 5. `Path.cwd()` fallback
 
-All of these are read at process startup, so none of them help once the
-editor switches projects under a running server.
+Git resolves a selected subdirectory to its worktree root. Each operation
+uses that path through completion, including any push retry. If the editor
+keeps the server's original environment and working directory, pass the
+new project's absolute path as `repo_path`.
 
 ## Dead End: The MCP Roots Protocol
 
@@ -56,7 +55,7 @@ mechanism.
 
 ## Diagnosis Tooling
 
-The `fckgit_debug` tool was extended to make the bug observable:
+During the investigation, `fckgit_debug` reported the following information.
 
 - when and how the workspace was detected, and time elapsed since
 - a fresh detection run compared against the cached value
@@ -75,5 +74,6 @@ exposes `get_cache_stats()` / `invalidate_cache()`.
 | **B. Request roots from client** | Proper MCP, but client support is unverified |
 | **C. Hybrid** (roots on init, env fallback, per-call re-detect) | Best long-term, most complexity |
 
-Option A is the intended next step; until it lands, restarting the IDE (and
-with it the MCP server) after switching projects is the workaround.
+The server now uses per-call detection and accepts an explicit target.
+To verify a switch, call `fckgit_debug` with the same arguments and inspect
+`workspace_path`, `detection_method` and `git_root`.

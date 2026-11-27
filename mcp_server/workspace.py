@@ -79,22 +79,14 @@ class WorkspaceDetector:
             InvalidWorkspaceError: If workspace cannot be determined
         """
         with self._lock:
-            # Return cached workspace if already initialized and no override
-            if self._initialized and self._workspace and not override:
-                return self._workspace
-            
             # Try detection strategies in order
             workspace = None
             
             # 1. Use override if provided
             detection_method = None
-            if override:
-                try:
-                    workspace = self._sanitize_path(override)
-                    detection_method = "override_parameter"
-                except InvalidWorkspaceError:
-                    # Log but continue to other strategies
-                    pass
+            if override is not None:
+                workspace = self._sanitize_path(override)
+                detection_method = "override_parameter"
             
             # 2. Check WORKSPACE_FOLDER_PATHS from Cursor/VSCode
             if not workspace and 'WORKSPACE_FOLDER_PATHS' in os.environ:
@@ -118,14 +110,14 @@ class WorkspaceDetector:
                     # Log but continue
                     pass
             
-            # 4. Use git command to find repository root
-            if not workspace:
-                try:
-                    workspace = self._use_git_command(Path.cwd())
-                    detection_method = "git_rev_parse"
-                except (GitNotFoundError, InvalidWorkspaceError):
-                    # Git command failed, will fall back to cwd
-                    pass
+            # Resolve subdirectories to their worktree root.
+            try:
+                root = self._use_git_command(workspace or Path.cwd())
+                if root:
+                    workspace = root
+                    detection_method = detection_method or "git_rev_parse"
+            except (GitNotFoundError, InvalidWorkspaceError):
+                pass
             
             # 5. Fallback to current working directory
             if not workspace:
@@ -137,12 +129,7 @@ class WorkspaceDetector:
                         f"Cannot determine workspace: current directory inaccessible: {e}"
                     )
             
-            # Validate it's a git repository (optional, log warning if not)
-            if not self._validate_git_repo(workspace):
-                # Not a git repo, but we'll allow it (user might init later)
-                pass
-            
-            # Cache the result
+            # Record the last detection for diagnostics.
             self._workspace = workspace
             self._initialized = True
             self._detection_timestamp = time.time()
@@ -213,29 +200,6 @@ class WorkspaceDetector:
             # Other errors (permission denied, etc.)
             raise GitNotFoundError(f"git command failed: {e}")
     
-    def _validate_git_repo(self, path: Path) -> bool:
-        """
-        Validate that a path is actually a git repository.
-        
-        Args:
-            path: Path to validate
-            
-        Returns:
-            True if valid git repository, False otherwise
-        """
-        try:
-            result = subprocess.run(
-                ['git', 'rev-parse', '--git-dir'],
-                cwd=str(path),
-                capture_output=True,
-                text=True,
-                timeout=5.0,
-                stdin=subprocess.DEVNULL,
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
-    
     def _sanitize_path(self, path: str) -> Path:
         """
         Sanitize and validate a path for security.
@@ -250,6 +214,8 @@ class WorkspaceDetector:
             InvalidWorkspaceError: If path is invalid or insecure
         """
         try:
+            if not isinstance(path, str) or not path.strip():
+                raise InvalidWorkspaceError("Expected a non-empty directory path")
             # Resolve the path (handles symlinks, relative paths)
             resolved = Path(path).resolve(strict=False)
             
@@ -273,7 +239,7 @@ class WorkspaceDetector:
             
             return resolved
             
-        except (OSError, RuntimeError) as e:
+        except (OSError, RuntimeError, ValueError) as e:
             raise InvalidWorkspaceError(f"Invalid path: {e}")
     
     def invalidate_cache(self):

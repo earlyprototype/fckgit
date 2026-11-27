@@ -242,9 +242,12 @@ Restart your IDE after updating.
 
 ### Manual Workspace Override
 
-If you need to force a specific project path (e.g., for testing or unusual setups):
+To target one call, pass a directory in the repository. For example, call
+`fckgit_status` with `{"repo_path": "/projects/my-app", "include_diff": true}`.
+Use an absolute path when the editor and server have different working
+directories. The next call can select a different repository.
 
-**Using PROJECT_ROOT (recommended):**
+**Using PROJECT_ROOT as a default**
 
 ```json
 {
@@ -278,7 +281,9 @@ If you need to force a specific project path (e.g., for testing or unusual setup
 }
 ```
 
-Both methods override automatic detection. Restart Cursor after changing these settings.
+Without `repo_path`, the server checks `WORKSPACE_FOLDER_PATHS`, then
+`PROJECT_ROOT`, then its working directory. Restart Cursor to load changes
+to the server configuration.
 
 ### Debug Logging
 
@@ -320,11 +325,11 @@ For technical details about the implementation, see [mcp_server/README.md](mcp_s
 
 **Key Features:**
 
-1. **Automatic workspace detection**: Works out of the box in Cursor - just switch projects!
+1. **Workspace selection**: Each call can specify a repository or use workspace detection.
 2. **Security first**: Never uses `shell=True`, validates all inputs
 3. **Git-native detection**: Uses git commands to handle worktrees, submodules, etc.
 4. **Robust error handling**: Clear error messages for easy debugging
-5. **Performance**: Thread-safe caching with 60s TTL, <1ms cached lookups
+5. **Consistent targeting**: A multi-step operation uses one repository from start to finish.
 6. **Cross-platform**: Windows, Mac, Linux support with platform-specific optimisations
 
 ## Examples
