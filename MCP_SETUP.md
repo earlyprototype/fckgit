@@ -15,9 +15,12 @@ pip install -e ".[mcp]"
 Set `GEMINI_API_KEY` in the server environment or in a Git-ignored `.env`
 file in the selected workspace. CLI help, `fckgit_status`,
 `fckgit_debug` and commits with a supplied message work without a key.
-Automatic staging stops if a pending file contains a Gemini key assignment,
-including when the server uses its own key. If the staged tree changes while
-Gemini prepares a message, review the staged files and retry the commit.
+Automatic staging checks pending files for Gemini key assignments even when
+the server uses a different key. It recognizes UTF-16 files with a byte
+order mark. Message generation reads those files from the index when Git
+reports a binary diff. If the staged tree changes while Gemini prepares a
+message, review the staged files and retry the commit. Automatic commits
+run the hooks selected by Git's effective `core.hooksPath`.
 [Get a Gemini API key](https://makersuite.google.com/app/apikey).
 
 ### 3. Configure (Choose Your IDE)
@@ -187,7 +190,11 @@ Tell your AI assistant:
 - `fckgit_push` - Push to remote
 - `fckgit_cleanup_lock` - Clean up git lock files
 
-The push tool runs `git push` in the selected repository and honors `push.default`.
+The push tool runs `git push` in the selected repository. Git selects the
+remote using the branch configuration and `remote.pushDefault`. If the server
+filters an inherited transport override such as `remote.origin.pushurl`, it
+stops before pushing. Move that override from the server environment to the
+selected repository's Git configuration.
 If the remote has no configured push refspec, `push.default=nothing` makes Git refuse the push.
 
 ## Testing

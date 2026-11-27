@@ -10,7 +10,8 @@ from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 from fckgit_gemini import (
-    GeminiConfigurationError, check_diff_for_key, check_files_before_staging, configured_key, get_client,
+    GeminiConfigurationError, check_diff_for_key, check_files_before_staging, check_staged_encodings,
+    configured_key, get_client,
 )
 from fckgit_index import StagedChanges
 
@@ -22,7 +23,7 @@ import mcp.server.stdio
 
 # Import our new modules
 from .workspace import WorkspaceDetector, WorkspaceError, InvalidWorkspaceError
-from .git_utils import detect_git_repo_type, workspace_git_env
+from .git_utils import GitUtilsError, detect_git_repo_type, workspace_git_env
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
 
@@ -111,7 +112,10 @@ async def run_git_command(
     # Get platform-specific subprocess kwargs
     kwargs = get_subprocess_kwargs(is_background=False, timeout=timeout)
     kwargs['cwd'] = str(cwd)
-    kwargs['env'] = workspace_git_env()
+    try:
+        kwargs['env'] = workspace_git_env(operation=cmd[1])
+    except GitUtilsError as exc:
+        return GitCommandResult("", str(exc), 1, 0.0, " ".join(cmd))
     
     # Log command execution (without sensitive data)
     cmd_str = ' '.join(cmd)
@@ -333,9 +337,9 @@ async def commit_changes(workspace: Path, message: str, stage_all: bool = True,
     if staged is not None:
         try:
             await asyncio.get_running_loop().run_in_executor(
-                None, staged.commit, message, workspace, workspace_git_env()
+                None, staged.commit, message, workspace, workspace_git_env(operation="commit")
             )
-        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+        except (GitUtilsError, RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
             return False, f"Commit failed: {exc}"
     else:
         result = await run_git_command(["git", "commit", "-m", message], workspace)
@@ -428,7 +432,7 @@ async def start_watch_mode(workspace: Path, cooldown: int = 30, faang_mode: bool
     
     # Start the process
     try:
-        env = workspace_git_env()
+        env = workspace_git_env(operation="push")
         key = configured_key(workspace)
         if key:
             env["GEMINI_API_KEY"] = key
@@ -811,12 +815,16 @@ async def _call_tool(name: str, arguments: dict[str, Any] | None):
     elif name == "fckgit_generate_message":
         use_staged = arguments.get("use_staged", False)
         
-        if use_staged:
-            diff = await get_staged_diff(workspace)
-        else:
-            staged = await get_staged_diff(workspace)
-            unstaged = await get_diff(workspace)
-            diff = staged or unstaged
+        diff = await get_staged_diff(workspace)
+        if diff:
+            try:
+                await asyncio.get_running_loop().run_in_executor(
+                    None, check_staged_encodings, workspace, workspace_git_env(), diff
+                )
+            except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+                return [types.TextContent(type="text", text=str(exc))]
+        elif not use_staged:
+            diff = await get_diff(workspace)
         
         if not diff.strip():
             return [types.TextContent(type="text", text="No changes to generate message for")]

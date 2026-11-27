@@ -216,8 +216,12 @@ class GitChangeHandler(FileSystemEventHandler):
         return True
     
     def _on_change(self, event):
-        if not self.should_process(event):
-            return
+        if self.should_process(event):
+            self.check_for_changes()
+
+    on_created = on_modified = on_deleted = on_moved = _on_change
+
+    def check_for_changes(self):
         with self._lock:
             if self._stopped or self._timer is not None:
                 return
@@ -228,8 +232,6 @@ class GitChangeHandler(FileSystemEventHandler):
                 self._timer.start()
             else:
                 self.process_changes()
-
-    on_created = on_modified = on_deleted = on_moved = _on_change
 
     def _process_pending(self):
         with self._lock:
@@ -319,31 +321,13 @@ def watch_mode(faang_mode: bool = False, cooldown: int = 30):
     print("="*50)
     print()
     
-    # Check for existing changes before starting to watch
-    if watch_status().strip():
-        if faang_mode:
-            print("🔍 Found existing changes, committing before starting watch... (SILICON VALLEY MODE)")
-        else:
-            print("🔍 Found existing changes, committing before starting watch...")
-        
-        try:
-            staged = prepare_staged_changes()
-            if staged.diff.strip():
-                message = generate_message(staged.diff, faang_mode=faang_mode)
-                if message:
-                    if commit(message, stage_all=False, staged=staged):
-                        push()
-                        print()
-        except Exception as e:
-            print(f"❌ Error committing existing changes: {e}")
-            print()
-    
     event_handler = GitChangeHandler(faang_mode=faang_mode, cooldown=cooldown)
     observer = Observer()
     observer.schedule(event_handler, ".", recursive=True)
     observer.start()
     
     try:
+        event_handler.check_for_changes()
         while True:
             time.sleep(1)
     except KeyboardInterrupt:

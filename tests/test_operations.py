@@ -2,6 +2,7 @@
 
 import ast
 import asyncio
+import codecs
 import json
 import shutil
 import subprocess
@@ -47,7 +48,7 @@ def isolated_repo(git_repo, tmp_path, monkeypatch):
             assert any(cwd == root or root in cwd.parents for root in (git_repo, tmp_path))
             if command[1] in ("push", "pull", "fetch"):
                 remote = run(["git", "remote", "get-url", "--push", "origin"],
-                             cwd=cwd, capture_output=True, text=True)
+                             cwd=cwd, env=kwargs.get("env"), capture_output=True, text=True)
                 if command[1] != "push" or remote.stdout.strip() != str(tmp_path / "local.git"):
                     pytest.fail(f"Unexpected git {command[1]} in an offline test")
         return run(command, **kwargs)
@@ -76,8 +77,12 @@ def run_cli(mode, monkeypatch, path):
     elif mode == "event":
         cli.GitChangeHandler().on_created(FileCreatedEvent(str(path)))
     else:
+        def stop_after_scan(seconds):
+            if seconds == 1:
+                raise KeyboardInterrupt
+
         monkeypatch.setattr(cli, "Observer", Mock)
-        monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=Mock(side_effect=KeyboardInterrupt)))
+        monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=stop_after_scan, monotonic=time.monotonic))
         cli.watch_mode()
 
 
@@ -134,6 +139,38 @@ def test_watch_processes_last_save_during_cooldown(git_repo, prompts, monkeypatc
     assert len(prompts) == 2
     assert "+first save" in prompts[0] and "+last save" in prompts[1]
     assert git(git_repo, "show", "HEAD:last.txt") == "last save"
+    assert git(git_repo, "status", "--porcelain") == ""
+
+
+def test_watch_save_during_initial_generation(git_repo, monkeypatch):
+    (git_repo / "first.txt").write_text("first save\n")
+    inputs = []
+    finished = Event()
+
+    def generate(self, *, model, contents):
+        inputs.append(contents)
+        if len(inputs) == 1:
+            (git_repo / "final.txt").write_text("last save\n")
+        return SimpleNamespace(text="feat: Record save")
+
+    def push():
+        if len(inputs) == 2:
+            finished.set()
+
+    def watch_sleep(seconds):
+        if seconds == 1:
+            finished.wait(15)
+            raise KeyboardInterrupt
+        time.sleep(seconds)
+
+    monkeypatch.setattr(Models, "generate_content", generate)
+    monkeypatch.setattr(cli, "push", push)
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=watch_sleep, monotonic=time.monotonic))
+    cli.watch_mode(cooldown=0)
+    assert len(inputs) == 2
+    assert "+first save" in inputs[0] and "+last save" in inputs[1]
+    assert git(git_repo, "show", "HEAD^:first.txt") == "first save"
+    assert git(git_repo, "show", "HEAD:final.txt") == "last save"
     assert git(git_repo, "status", "--porcelain") == ""
 
 
@@ -274,6 +311,20 @@ def test_commit_honors_message_hook(git_repo, prompts, monkeypatch):
     result = call_tool("fckgit_commit", push=True)
     assert "message rejected" in result
     assert len(prompts) == 1 and git(git_repo, "rev-parse", "HEAD") == original
+
+
+def test_mcp_honors_inherited_rejecting_hook(git_repo, prompts, monkeypatch):
+    original = git(git_repo, "rev-parse", "HEAD")
+    install_hook(git_repo, "commit-msg", 'echo "operator rejected message" >&2; exit 1')
+    git(git_repo, "config", "--unset", "core.hooksPath")
+    monkeypatch.setenv("GIT_CONFIG_PARAMETERS", "'core.hooksPath'='.git/custom hooks'")
+    child = git_repo / "src"
+    child.mkdir()
+    (child / "pending.txt").touch()
+    result = call_tool("fckgit_commit", workspace_path=str(child))
+    assert "operator rejected message" in result
+    assert len(prompts) == 1
+    assert git(git_repo, "rev-parse", "HEAD") == original
 
 
 def test_reference_hook_can_reject_the_commit(git_repo, prompts):
@@ -418,6 +469,33 @@ def test_mcp_json_credential_with_different_client_key(git_repo, prompts, staged
     assert prompts == []
     assert git(git_repo, "rev-parse", "HEAD") == original
     assert (git_repo / ".git" / "index").read_bytes() == index
+
+
+@pytest.mark.parametrize(("bom", "encoding"), [
+    (codecs.BOM_UTF16_LE, "utf-16-le"), (codecs.BOM_UTF16_BE, "utf-16-be"),
+])
+@pytest.mark.parametrize("staged_only", [False, True])
+def test_mcp_blocks_utf16_config(git_repo, prompts, bom, encoding, staged_only):
+    config = git_repo / "mcp.json"
+    document = json.dumps({"env": {"GEMINI_API_KEY": "fixture-utf16"}}, indent=2)
+    config.write_bytes(bom + document.encode(encoding))
+    if staged_only:
+        git(git_repo, "add", "mcp.json")
+        config.write_text("{}")
+    original = git(git_repo, "rev-parse", "HEAD")
+    index = (git_repo / ".git" / "index").read_bytes()
+    entries = git(git_repo, "ls-files", "--stage")
+    if staged_only:
+        result = call_tool("fckgit_generate_message", use_staged=True)
+        assert "GEMINI_API_KEY" in result and "fixture-utf16" not in result
+        assert (git_repo / ".git" / "index").read_bytes() == index
+    result = call_tool("fckgit_commit", stage_all=not staged_only)
+    assert "GEMINI_API_KEY" in result and "fixture-utf16" not in result
+    assert not prompts
+    assert git(git_repo, "rev-parse", "HEAD") == original
+    assert git(git_repo, "ls-files", "--stage") == entries
+    if not staged_only:
+        assert (git_repo / ".git" / "index").read_bytes() == index
 
 
 def test_staged_diff_with_removed_key_stays_local(git_repo, prompts, monkeypatch, capsys):
@@ -708,3 +786,38 @@ def test_mcp_push_respects_operator_restrictions(git_repo, tmp_path, monkeypatch
     result = call_tool("fckgit_push")
     assert git(remote, "rev-parse", f"refs/heads/{branch}") == original
     assert diagnostic in result
+
+
+@pytest.mark.parametrize("setting", ["remote.pushDefault", "branch.{branch}.pushRemote"])
+def test_mcp_push_to_inherited_remote(git_repo, tmp_path, monkeypatch, setting):
+    branch = git(git_repo, "branch", "--show-current")
+    ref = f"refs/heads/{branch}"
+    origin = tmp_path / "local.git"
+    review = tmp_path / "review.git"
+    for name, path in (("origin", origin), ("review", review)):
+        git(tmp_path, "init", "--bare", str(path))
+        git(git_repo, "remote", "add", name, str(path))
+    git(git_repo, "config", "push.default", "current")
+    monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", setting.format(branch=branch))
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "review")
+    assert "Successfully pushed" in call_tool("fckgit_push")
+    assert git(origin, "for-each-ref", ref) == ""
+    assert git(review, "rev-parse", ref) == git(git_repo, "rev-parse", "HEAD")
+
+
+def test_mcp_refuses_filtered_push_url(git_repo, tmp_path, monkeypatch):
+    origin = tmp_path / "local.git"
+    review = tmp_path / "review.git"
+    for path in (origin, review):
+        git(tmp_path, "init", "--bare", str(path))
+    git(git_repo, "remote", "add", "origin", str(origin))
+    git(git_repo, "config", "push.default", "current")
+    monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "remote.origin.pushurl")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(review))
+    result = call_tool("fckgit_push")
+    assert "inherited" in result and "push" in result.lower()
+    assert git(origin, "for-each-ref") == git(review, "for-each-ref") == ""

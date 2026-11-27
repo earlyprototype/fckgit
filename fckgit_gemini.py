@@ -1,5 +1,6 @@
 """Gemini configuration shared by the CLI and MCP tools."""
 
+import codecs
 import os
 import re
 import stat
@@ -71,6 +72,58 @@ def _has_key_assignment(line):
     return _KEY_ASSIGNMENT.match(line) or _JSON_KEY_ASSIGNMENT.search(line)
 
 
+def _bom_encoding(stream):
+    prefix = stream.peek(4)[:4]
+    if prefix.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE)):
+        return "utf-32"
+    if prefix.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return "utf-16"
+    return None
+
+
+def _encoded_stream_contains_key(stream, encoding, needles):
+    for line in codecs.getreader(encoding)(stream, errors="replace"):
+        data = line.rstrip("\r\n").encode("utf-8")
+        if _has_key_assignment(data) or any(needle in data for needle in needles):
+            return True
+    return False
+
+
+def check_staged_encodings(directory, env, diff, base=None, tree=None):
+    """Read changed binary blobs directly when Git omits their contents from the patch."""
+    if not diff:
+        return
+    revisions = [base, tree] if tree else ["--cached"]
+    stats = subprocess.run(
+        ["git", "diff", "--numstat", "-z", "--no-renames", "--no-relative", "--no-textconv",
+         "--no-ext-diff", "--ignore-submodules=all", "--diff-filter=AMT", *revisions, "--"],
+        cwd=directory, env=env, capture_output=True, timeout=60,
+    )
+    if stats.returncode:
+        raise RuntimeError("Git could not list staged files to check for credentials.")
+    needles = tuple(key.encode("utf-8") for key in _credential_values(directory))
+    # A diff driver can force UTF-16 text into the patch with embedded NULs.
+    forced_text = "\0" in diff
+    for entry in stats.stdout.split(b"\0"):
+        if not entry or (not entry.startswith(b"-\t-\t") and not forced_text):
+            continue
+        path = os.fsdecode(entry.split(b"\t", 2)[2])
+        with subprocess.Popen(["git", "cat-file", "blob", f"{tree or ''}:{path}"],
+                              cwd=directory, env=env, stdin=subprocess.DEVNULL,
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as blob:
+            with blob.stdout as stream:
+                encoding = _bom_encoding(stream)
+                if encoding and _encoded_stream_contains_key(stream, encoding, needles):
+                    raise GeminiConfigurationError(
+                        "A staged file contains a GEMINI_API_KEY. Remove the credential before committing."
+                    )
+                # Drain other binary formats without retaining the blob in memory.
+                while stream.read(65536):
+                    pass
+            if blob.wait():
+                raise RuntimeError("Git could not read a staged file to check for credentials.")
+
+
 def check_files_before_staging(directory=None, env=None):
     """Check only the files Git could stage, including untracked files."""
     directory = directory or Path.cwd()
@@ -119,6 +172,11 @@ def _file_contains_key(path, needles):
     if not stat.S_ISREG(mode):
         return False
     with path.open("rb") as stream:
+        encoding = _bom_encoding(stream)
+        if encoding:
+            if _encoded_stream_contains_key(stream, encoding, needles):
+                return True
+            stream.seek(0)
         tail = b""
         overlap = max(map(len, (*needles, _KEY_NAME))) - 1
         has_key_name = False

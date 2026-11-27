@@ -26,7 +26,7 @@ _REPOSITORY_ENV = {
 }
 
 
-def workspace_git_env():
+def workspace_git_env(operation=None):
     """Let Git discover the requested repository from the child's cwd."""
     env = {
         name: value for name, value in os.environ.items()
@@ -44,12 +44,22 @@ def workspace_git_env():
     count = 0
     for key, value in settings:
         name = key.lower()
-        if name in {"core.worktree", "core.bare", "core.hookspath", "core.fsmonitor",
-                    "core.sshcommand", "core.gitproxy", "core.alternaterefscommand",
-                    "core.repositoryformatversion", "diff.external"}:
+        if name in {"core.worktree", "core.bare", "core.fsmonitor", "core.alternaterefscommand",
+                    "core.repositoryformatversion", "diff.external"} or name.startswith(("filter.", "extensions.")):
             continue
-        if name.startswith(("include.", "includeif.", "extensions.", "remote.", "branch.",
-                            "url.", "submodule.", "filter.")):
+        # Branch tracking and remote.pushDefault select a remote in the current worktree.
+        if name.startswith("branch.") and not name.endswith((".remote", ".pushremote", ".merge")):
+            continue
+        include = name.startswith(("include.", "includeif."))
+        filtered_transport = name != "remote.pushdefault" and (
+            name.startswith(("remote.", "url.", "submodule.")) or name in {"core.sshcommand", "core.gitproxy"}
+        )
+        if include or filtered_transport:
+            if operation in {"push", "pull"}:
+                raise GitUtilsError("Cannot push with inherited Git transport or include overrides. "
+                                    "Configure the destination in the selected repository.")
+            if include and operation == "commit":
+                raise GitUtilsError("Cannot resolve commit hooks from an inherited Git config include.")
             continue
         # Keep transport restrictions when removing inherited transport overrides.
         if name.startswith("protocol.") and not (name.endswith(".allow") and value.lower() in {"never", "user"}):

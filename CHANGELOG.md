@@ -7,14 +7,17 @@
 - One-shot and watch commits include new files, including files saved by rename.
 - CLI and MCP commits use a whole-repository diff from any subdirectory. The commit
   stops if the branch, parent commit, or staged tree changes during message generation.
-  Git hooks can reject the commit. A hook that changes the reviewed tree also stops the commit.
+  Hooks from the effective `core.hooksPath` can reject the commit. A hook that changes
+  the reviewed tree also stops the commit.
 - CLI help, repository diagnostics and commits with a supplied message work without a Gemini key.
-- MCP tools keep Git author settings and honor `push.default` while filtering repository overrides. The watcher
-  starts the installed script even if the selected project contains a module named `fckgit`.
-- Automatic staging and message generation check dotenv and MCP JSON key assignments
-  even when the environment supplies a different Gemini key.
-- Watch mode checks for pending saves when the cooldown expires and includes new files
-  when Git status hides them. One-shot mode exits with an error if the commit fails.
+- MCP tools keep Git author settings, push defaults and branch remote selection.
+  A filtered transport override stops a push. The watcher starts the installed
+  script even if the selected project contains a module named `fckgit`.
+- Automatic staging and message generation check dotenv and MCP JSON key assignments,
+  including BOM-marked UTF-16 files, even when the environment supplies a different Gemini key.
+- Watch mode observes saves during the initial commit, checks pending changes after
+  cooldown and includes new files when Git status hides them. One-shot mode exits
+  with an error if the commit fails.
 
 ## [0.2.2] - 2026-01-06
 

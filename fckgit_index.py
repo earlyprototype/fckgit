@@ -9,6 +9,11 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+if __package__:
+    from .fckgit_gemini import check_staged_encodings
+else:
+    from fckgit_gemini import check_staged_encodings
+
 
 def _git(args, cwd, env, allow_missing=False):
     result = subprocess.run(
@@ -98,8 +103,10 @@ class StagedChanges:
         ref, parent = _head(cwd, env)
         base = parent or _git(["hash-object", "-t", "tree", "--stdin"], cwd, env).strip()
         tree = _git(["write-tree"], cwd, env).strip()
-        diff = _git(["diff", "--no-relative", "--no-color", base.decode(), tree.decode(), "--"], cwd, env)
-        return cls(ref, parent, tree, diff.decode("utf-8", "replace"))
+        revisions = [base.decode(), tree.decode()]
+        diff = _git(["diff", "--no-relative", "--no-color", *revisions, "--"], cwd, env).decode("utf-8", "replace")
+        check_staged_encodings(cwd, env, diff, *revisions)
+        return cls(ref, parent, tree, diff)
 
     def _commit_with_hooks(self, message, cwd, env, directory):
         version = re.match(rb"git version (\d+)\.(\d+)", _git(["--version"], cwd, env))
