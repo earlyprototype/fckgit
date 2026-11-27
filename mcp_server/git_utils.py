@@ -46,10 +46,13 @@ def workspace_git_env():
         name = key.lower()
         if name in {"core.worktree", "core.bare", "core.hookspath", "core.fsmonitor",
                     "core.sshcommand", "core.gitproxy", "core.alternaterefscommand",
-                    "core.repositoryformatversion", "push.default", "diff.external"}:
+                    "core.repositoryformatversion", "diff.external"}:
             continue
         if name.startswith(("include.", "includeif.", "extensions.", "remote.", "branch.",
-                            "url.", "submodule.", "filter.", "protocol.")):
+                            "url.", "submodule.", "filter.")):
+            continue
+        # Keep transport restrictions when removing inherited transport overrides.
+        if name.startswith("protocol.") and not (name.endswith(".allow") and value.lower() in {"never", "user"}):
             continue
         env[f"GIT_CONFIG_KEY_{count}"] = key
         env[f"GIT_CONFIG_VALUE_{count}"] = value

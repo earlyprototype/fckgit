@@ -2,6 +2,7 @@ import subprocess
 import os
 import sys
 import argparse
+import threading
 import time
 from datetime import datetime
 
@@ -194,9 +195,12 @@ class GitChangeHandler(FileSystemEventHandler):
     """Handle file system events and trigger commits."""
     
     def __init__(self, faang_mode: bool = False, cooldown: int = 30):
-        self.last_commit_time = 0
+        self.last_commit_time = float("-inf")
         self.cooldown = cooldown  # seconds between commits
         self.faang_mode = faang_mode
+        self._lock = threading.Lock()
+        self._timer = None
+        self._stopped = False
         
     def should_process(self, event):
         """Check if we should process this event."""
@@ -209,31 +213,36 @@ class GitChangeHandler(FileSystemEventHandler):
         if ".git" in path.replace("\\", "/").split("/"):
             return False
         
-        # Check cooldown
-        current_time = time.time()
-        if current_time - self.last_commit_time < self.cooldown:
-            return False
-        
         return True
     
-    def on_modified(self, event):
-        """Handle file modification events."""
-        if self.should_process(event):
-            self.process_changes()
-    
-    def on_created(self, event):
-        """Handle file creation events."""
-        if self.should_process(event):
-            self.process_changes()
-    
-    def on_deleted(self, event):
-        """Handle file deletion events."""
-        if self.should_process(event):
-            self.process_changes()
+    def _on_change(self, event):
+        if not self.should_process(event):
+            return
+        with self._lock:
+            if self._stopped or self._timer is not None:
+                return
+            delay = self.last_commit_time + self.cooldown - time.monotonic()
+            if delay > 0:
+                self._timer = threading.Timer(delay, self._process_pending)
+                self._timer.daemon = True
+                self._timer.start()
+            else:
+                self.process_changes()
 
-    def on_moved(self, event):
-        if self.should_process(event):
-            self.process_changes()
+    on_created = on_modified = on_deleted = on_moved = _on_change
+
+    def _process_pending(self):
+        with self._lock:
+            self._timer = None
+            if not self._stopped:
+                self.process_changes()
+
+    def stop(self):
+        with self._lock:
+            self._stopped = True
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
     
     def process_changes(self):
         """Process git changes."""
@@ -245,7 +254,7 @@ class GitChangeHandler(FileSystemEventHandler):
         if not status.strip():
             # No changes in git, silently skip (likely temp files or already committed)
             return
-        self.last_commit_time = time.time()
+        self.last_commit_time = time.monotonic()
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         changed_files = [line[3:] for line in status.splitlines()]
@@ -339,8 +348,10 @@ def watch_mode(faang_mode: bool = False, cooldown: int = 30):
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n\n✓ Stopped watching.")
+    finally:
         observer.stop()
-    observer.join()
+        event_handler.stop()
+        observer.join()
 
 
 def main():

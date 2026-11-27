@@ -5,14 +5,16 @@
 - MCP tools select one workspace per request. An explicit path resolves multi-root ambiguity.
 - Automatic commits report Git index lock contention and stop before pushing.
 - One-shot and watch commits include new files, including files saved by rename.
-- CLI and MCP commits use a whole-repository diff from any subdirectory. If another
-  writer changes the staged tree during message generation, the commit stops and preserves the index.
+- CLI and MCP commits use a whole-repository diff from any subdirectory. The commit
+  stops if the branch, parent commit, or staged tree changes during message generation.
+  Git hooks can reject the commit. A hook that changes the reviewed tree also stops the commit.
 - CLI help, repository diagnostics and commits with a supplied message work without a Gemini key.
-- MCP tools keep Git author settings while filtering repository overrides. The watcher
+- MCP tools keep Git author settings and honor `push.default` while filtering repository overrides. The watcher
   starts the installed script even if the selected project contains a module named `fckgit`.
-- Automatic staging and message generation check for Gemini key assignments even
-  when the environment supplies a different key.
-- Watch mode includes new files when Git status hides them. One-shot mode exits with an error if the commit fails.
+- Automatic staging and message generation check dotenv and MCP JSON key assignments
+  even when the environment supplies a different Gemini key.
+- Watch mode checks for pending saves when the cooldown expires and includes new files
+  when Git status hides them. One-shot mode exits with an error if the commit fails.
 
 ## [0.2.2] - 2026-01-06
 

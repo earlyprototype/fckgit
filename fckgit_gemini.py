@@ -49,7 +49,7 @@ def get_client(directory=None):
 
 def check_diff_for_key(diff, directory=None):
     # Check added, removed and context lines, including an index-only credential.
-    assignment = any(_KEY_ASSIGNMENT.match(line[1:]) for line in diff.encode().splitlines()
+    assignment = any(_has_key_assignment(line[1:]) for line in diff.encode().splitlines()
                      if line[:1] in (b"+", b"-", b" "))
     if assignment or any(key in diff for key in _credential_values(directory)):
         raise GeminiConfigurationError(
@@ -64,6 +64,11 @@ _KEY_ASSIGNMENT = re.compile(
     rb"^(?:\xef\xbb\xbf)?[ \t]*(?:export[ \t]+)?(?:GEMINI_API_KEY|'GEMINI_API_KEY')[ \t]*="
     rb"[ \t]*(?!['\"]{2}[ \t]*(?:#|$))[^ \t\r\n#]"
 )
+_JSON_KEY_ASSIGNMENT = re.compile(rb'"GEMINI_API_KEY"[ \t]*:[ \t]*(?:"[^"]|$)')
+
+
+def _has_key_assignment(line):
+    return _KEY_ASSIGNMENT.match(line) or _JSON_KEY_ASSIGNMENT.search(line)
 
 
 def check_files_before_staging(directory=None, env=None):
@@ -125,7 +130,7 @@ def _file_contains_key(path, needles):
             tail = data[-overlap:]
         if has_key_name:
             stream.seek(0)
-            return any(_KEY_ASSIGNMENT.match(line.rstrip(b"\r\n")) for line in stream)
+            return any(_has_key_assignment(line.rstrip(b"\r\n")) for line in stream)
     return False
 
 

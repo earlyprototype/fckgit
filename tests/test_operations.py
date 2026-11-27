@@ -2,6 +2,7 @@
 
 import ast
 import asyncio
+import json
 import shutil
 import subprocess
 import sys
@@ -10,6 +11,7 @@ import time
 from contextlib import ExitStack, contextmanager
 from importlib import import_module
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -44,7 +46,10 @@ def isolated_repo(git_repo, tmp_path, monkeypatch):
             cwd = Path(kwargs.get("cwd", Path.cwd())).resolve()
             assert any(cwd == root or root in cwd.parents for root in (git_repo, tmp_path))
             if command[1] in ("push", "pull", "fetch"):
-                pytest.fail(f"Unexpected git {command[1]} in an offline test")
+                remote = run(["git", "remote", "get-url", "--push", "origin"],
+                             cwd=cwd, capture_output=True, text=True)
+                if command[1] != "push" or remote.stdout.strip() != str(tmp_path / "local.git"):
+                    pytest.fail(f"Unexpected git {command[1]} in an offline test")
         return run(command, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", local_run)
@@ -109,6 +114,29 @@ def test_watch_commits_file_saved_by_rename(git_repo, prompts, monkeypatch):
     push.assert_called_once()
 
 
+def test_watch_processes_last_save_during_cooldown(git_repo, prompts, monkeypatch):
+    pushed = Event()
+    monkeypatch.setattr(cli, "push", pushed.set)
+    observer = cli.Observer()
+    handler = cli.GitChangeHandler(cooldown=3)
+    observer.schedule(handler, str(git_repo), recursive=True)
+    observer.start()
+    try:
+        (git_repo / "first.txt").write_text("first save\n")
+        assert pushed.wait(10)
+        pushed.clear()
+        (git_repo / "last.txt").write_text("last save\n")
+        assert pushed.wait(10)
+    finally:
+        observer.stop()
+        handler.stop()
+        observer.join()
+    assert len(prompts) == 2
+    assert "+first save" in prompts[0] and "+last save" in prompts[1]
+    assert git(git_repo, "show", "HEAD:last.txt") == "last save"
+    assert git(git_repo, "status", "--porcelain") == ""
+
+
 @pytest.mark.parametrize("operation", ["once", "fckgit_commit"])
 def test_commit_from_subdirectory_includes_root_file(operation, git_repo, prompts, monkeypatch):
     git(git_repo, "config", "diff.relative", "true")
@@ -166,7 +194,7 @@ def test_index_stays_locked_through_git_commit(git_repo, prompts, monkeypatch):
     other_writer = []
 
     def run_with_contender(command, **kwargs):
-        if command[:2] == ["git", "commit"]:
+        if command[0] == "git" and "commit" in command[1:4]:
             (git_repo / "second.txt").write_text("another writer\n")
             other_writer.append(run(["git", "add", "second.txt"], cwd=git_repo,
                                     capture_output=True))
@@ -181,6 +209,99 @@ def test_index_stays_locked_through_git_commit(git_repo, prompts, monkeypatch):
     assert git(git_repo, "show", "HEAD:first.txt") == "prepared"
     assert git(git_repo, "status", "--porcelain") == "?? second.txt"
     git(git_repo, "add", "second.txt")  # The contender can retry after publication.
+
+
+@pytest.mark.parametrize("change", ["sibling", "parent"])
+def test_head_changed_during_generation(git_repo, monkeypatch, capsys, change):
+    original_ref = git(git_repo, "symbolic-ref", "HEAD")
+    original = git(git_repo, "rev-parse", "HEAD")
+    git(git_repo, "branch", "sibling")
+    expected_head = []
+    path = git_repo / "reviewed.txt"
+    path.write_text("reviewed\n")
+
+    def change_head(self, *, model, contents):
+        if change == "sibling":
+            git(git_repo, "switch", "sibling")
+        else:
+            git(git_repo, "commit", "--only", "--allow-empty", "-m", "Concurrent empty commit")
+        expected_head.append(git(git_repo, "rev-parse", "HEAD"))
+        return SimpleNamespace(text="feat: Add reviewed file")
+
+    monkeypatch.setattr(Models, "generate_content", change_head)
+    push = Mock()
+    monkeypatch.setattr(cli, "push", push)
+    with pytest.raises(SystemExit):
+        run_cli("once", monkeypatch, path)
+    assert "changed" in capsys.readouterr().out.lower()
+    assert git(git_repo, "rev-parse", "HEAD") == expected_head[0]
+    assert git(git_repo, "rev-parse", original_ref) == (original if change == "sibling" else expected_head[0])
+    assert git(git_repo, "diff", "--cached", "--name-only") == path.name
+    push.assert_not_called()
+
+
+def install_hook(repo, name, body):
+    hooks = repo / ".git" / "custom hooks"
+    hooks.mkdir(exist_ok=True)
+    git(repo, "config", "core.hooksPath", str(hooks))
+    hook = hooks / name
+    hook.write_bytes(("#!/bin/sh\n" + body + "\n").encode())
+    hook.chmod(0o755)
+
+
+@pytest.mark.parametrize("hook", ["pre-commit", "commit-msg"])
+def test_commit_refuses_tree_changed_by_hook(git_repo, prompts, monkeypatch, capsys, hook):
+    original = git(git_repo, "rev-parse", "HEAD")
+    install_hook(git_repo, hook, "echo generated > generated.txt && git add generated.txt")
+    path = git_repo / "reviewed.txt"
+    path.write_text("reviewed\n")
+    push = Mock()
+    monkeypatch.setattr(cli, "push", push)
+    with pytest.raises(SystemExit):
+        run_cli("once", monkeypatch, path)
+    assert "changed" in capsys.readouterr().out.lower()
+    assert len(prompts) == 1 and "+reviewed" in prompts[0] and "generated.txt" not in prompts[0]
+    assert git(git_repo, "rev-parse", "HEAD") == original
+    assert git(git_repo, "diff", "--cached", "--name-only") == path.name
+    assert (git_repo / "generated.txt").read_text().strip() == "generated"
+    push.assert_not_called()
+
+
+def test_commit_honors_message_hook(git_repo, prompts, monkeypatch):
+    original = git(git_repo, "rev-parse", "HEAD")
+    install_hook(git_repo, "commit-msg", 'echo "message rejected" >&2; exit 1')
+    (git_repo / "reviewed.txt").touch()
+    result = call_tool("fckgit_commit", push=True)
+    assert "message rejected" in result
+    assert len(prompts) == 1 and git(git_repo, "rev-parse", "HEAD") == original
+
+
+def test_reference_hook_can_reject_the_commit(git_repo, prompts):
+    original = git(git_repo, "rev-parse", "HEAD")
+    install_hook(git_repo, "reference-transaction",
+                 'if test "$1" = prepared && read -r old new ref; then\n'
+                 '    echo "operator declined $ref" >&2\n    exit 1\nfi')
+    (git_repo / "new.txt").touch()
+    assert "operator declined" in call_tool("fckgit_commit", push=True)
+    assert git(git_repo, "rev-parse", "HEAD") == original
+    assert git(git_repo, "diff", "--cached", "--name-only") == "new.txt"
+
+
+def test_unavailable_reference_hook_stops_before_commit(git_repo, prompts, monkeypatch):
+    # Git versions older than 2.28 silently ignore reference-transaction.
+    original = git(git_repo, "rev-parse", "HEAD")
+    run = subprocess.run
+
+    def older_git(command, **kwargs):
+        if command == ["git", "--version"]:
+            return subprocess.CompletedProcess(command, 0, b"git version 2.27.0\n", b"")
+        return run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", older_git)
+    (git_repo / "new.txt").touch()
+    result = call_tool("fckgit_commit")
+    assert git(git_repo, "rev-parse", "HEAD") == original
+    assert "Git 2.28" in result
 
 
 @pytest.mark.parametrize("mode", ["once", "event", "startup"])
@@ -279,6 +400,24 @@ def test_ignored_workspace_key_copied_to_pending_file(git_repo, prompts, monkeyp
     assert "GEMINI_API_KEY" in result and "workspace-fixture" not in result
     assert not prompts
     assert git(git_repo, "status", "--porcelain") == "?? notes.txt"
+
+
+@pytest.mark.parametrize("staged_only", [False, True])
+def test_mcp_json_credential_with_different_client_key(git_repo, prompts, staged_only):
+    config = git_repo / ".cursor" / "mcp.json"
+    config.parent.mkdir()
+    document = {"mcpServers": {"fckgit": {"env": dict(GEMINI_API_KEY="fixture-project-only")}}}
+    config.write_text(json.dumps(document, indent=2 if staged_only else None))
+    if staged_only:
+        git(git_repo, "add", ".cursor/mcp.json")
+        config.write_text("{}")
+    original = git(git_repo, "rev-parse", "HEAD")
+    index = (git_repo / ".git" / "index").read_bytes()
+    result = call_tool("fckgit_generate_message" if staged_only else "fckgit_commit", use_staged=True)
+    assert "GEMINI_API_KEY" in result and "fixture-project-only" not in result
+    assert prompts == []
+    assert git(git_repo, "rev-parse", "HEAD") == original
+    assert (git_repo / ".git" / "index").read_bytes() == index
 
 
 def test_staged_diff_with_removed_key_stays_local(git_repo, prompts, monkeypatch, capsys):
@@ -542,3 +681,30 @@ def test_mcp_keeps_git_author_settings_without_worktree_redirect(git_repo, tmp_p
     assert len(prompts) == 1 and "+selected workspace" in prompts[0]
     assert git(git_repo, "log", "-1", "--format=%an <%ae>") == "Environment Author <author@example.invalid>"
     assert git(git_repo, "show", "HEAD:target.txt") == "selected workspace"
+
+
+@pytest.mark.parametrize("source", ["numbered", "parameters"])
+@pytest.mark.parametrize(("setting", "value", "diagnostic"), [
+    ("push.default", "nothing", "push.default"),
+    ("protocol.file.allow", "never", "not allowed"),
+])
+def test_mcp_push_respects_operator_restrictions(git_repo, tmp_path, monkeypatch, source,
+                                                 setting, value, diagnostic):
+    remote = tmp_path / "local.git"
+    git(tmp_path, "init", "--bare", str(remote))
+    branch = git(git_repo, "symbolic-ref", "--short", "HEAD")
+    git(git_repo, "remote", "add", "origin", str(remote))
+    git(git_repo, "config", "protocol.allow", "never")
+    git(git_repo, "config", "protocol.file.allow", "always")
+    git(git_repo, "push", "-u", "origin", branch)
+    original = git(remote, "rev-parse", f"refs/heads/{branch}")
+    git(git_repo, "commit", "--allow-empty", "-m", "Local only")
+    if source == "numbered":
+        monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+        monkeypatch.setenv("GIT_CONFIG_KEY_0", setting)
+        monkeypatch.setenv("GIT_CONFIG_VALUE_0", value)
+    else:
+        monkeypatch.setenv("GIT_CONFIG_PARAMETERS", f"'{setting}'='{value}'")
+    result = call_tool("fckgit_push")
+    assert git(remote, "rev-parse", f"refs/heads/{branch}") == original
+    assert diagnostic in result

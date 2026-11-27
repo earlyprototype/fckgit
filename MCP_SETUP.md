@@ -187,6 +187,9 @@ Tell your AI assistant:
 - `fckgit_push` - Push to remote
 - `fckgit_cleanup_lock` - Clean up git lock files
 
+The push tool runs `git push` in the selected repository and honors `push.default`.
+If the remote has no configured push refspec, `push.default=nothing` makes Git refuse the push.
+
 ## Testing
 
 1. Restart your AI assistant (Cursor/Claude Desktop)
