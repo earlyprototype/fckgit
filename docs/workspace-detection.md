@@ -6,7 +6,9 @@ could still run in A.
 
 Each tool call now selects its workspace once. Every Git command in that
 operation, including a requested push or rebase, uses the selected directory.
-A watch process keeps the working directory it was started in.
+The server clears inherited Git repository overrides such as `GIT_DIR`,
+`GIT_WORK_TREE` and `GIT_INDEX_FILE` for discovery and Git commands.
+A watcher starts in the selected repository with the same overrides cleared.
 
 ## Selection order
 

@@ -12,7 +12,8 @@ pip install -e ".[mcp]"
 
 ### 2. Get Your API Key
 
-Set `GEMINI_API_KEY` to generate commit messages. CLI help, `fckgit_status`,
+Set `GEMINI_API_KEY` in the server environment or in a Git-ignored `.env`
+file in the selected workspace. CLI help, `fckgit_status`,
 `fckgit_debug` and commits with a supplied message work without a key.
 [Get a Gemini API key](https://makersuite.google.com/app/apikey).
 

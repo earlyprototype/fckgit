@@ -13,9 +13,13 @@ if sys.platform == 'win32':
         pass
 
 if __package__:
-    from .fckgit_gemini import GeminiConfigurationError, get_client
+    from .fckgit_gemini import (
+        GeminiConfigurationError, check_diff_for_key, check_files_before_staging, get_client,
+    )
 else:
-    from fckgit_gemini import GeminiConfigurationError, get_client
+    from fckgit_gemini import (
+        GeminiConfigurationError, check_diff_for_key, check_files_before_staging, get_client,
+    )
 
 try:
     from watchdog.observers import Observer
@@ -26,6 +30,7 @@ except ImportError:
     FileSystemEventHandler = object
 
 def stage_all_changes():
+    check_files_before_staging()
     result = subprocess.run(["git", "add", "-A"], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode:
         raise RuntimeError(f"Failed to stage files: {result.stderr.strip()}")
@@ -38,6 +43,7 @@ def stage_and_get_diff():
     result = subprocess.run(["git", "diff", "--cached"], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if result.returncode:
         raise RuntimeError(f"Failed to read staged changes: {result.stderr.strip()}")
+    check_diff_for_key(result.stdout)
     return result.stdout
 
 
@@ -177,6 +183,13 @@ def push():
             return False
 
 
+def watch_status():
+    return subprocess.run(
+        ["git", "--no-optional-locks", "status", "--porcelain", "--untracked-files=normal"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    ).stdout
+
+
 class GitChangeHandler(FileSystemEventHandler):
     """Handle file system events and trigger commits."""
     
@@ -225,13 +238,13 @@ class GitChangeHandler(FileSystemEventHandler):
         time.sleep(0.5)
         
         # Check if there are actually any changes in git
-        status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, encoding='utf-8', errors='replace')
-        if not status_result.stdout.strip():
+        status = watch_status()
+        if not status.strip():
             # No changes in git, silently skip (likely temp files or already committed)
             return
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        changed_files = [line.split()[-1] for line in status_result.stdout.strip().split('\n') if line.strip()]
+        changed_files = [line[3:] for line in status.splitlines()]
         
         print("\n" + "="*50)
         print(f"🔍 Changes detected at {timestamp}")
@@ -252,8 +265,7 @@ class GitChangeHandler(FileSystemEventHandler):
                     push()
                 else:
                     # Commit failed - check if it's because nothing to commit
-                    status_check = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-                    if not status_check.stdout.strip():
+                    if not watch_status().strip():
                         print("ℹ️  (Changes were already committed)")
             else:
                 print("❌ Failed to generate commit message.")
@@ -295,8 +307,7 @@ def watch_mode(faang_mode: bool = False, cooldown: int = 30):
     print()
     
     # Check for existing changes before starting to watch
-    status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, encoding='utf-8', errors='replace')
-    if status_result.stdout.strip():
+    if watch_status().strip():
         if faang_mode:
             print("🔍 Found existing changes, committing before starting watch... (SILICON VALLEY MODE)")
         else:
@@ -377,8 +388,9 @@ def main():
         message = generate_message(diff, faang_mode=args.faang)
         
         if message:
-            if commit(message, stage_all=False):
-                push()
+            if not commit(message, stage_all=False):
+                sys.exit(1)
+            push()
         else:
             print("❌ Failed to generate commit message.")
         return

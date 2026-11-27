@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict
 
+from .git_utils import workspace_git_env
+
 
 class WorkspaceError(Exception):
     """Base exception for workspace-related errors."""
@@ -153,6 +155,7 @@ class WorkspaceDetector:
             result = subprocess.run(
                 ['git', 'rev-parse', '--show-toplevel'],
                 cwd=str(cwd),
+                env=workspace_git_env(),
                 capture_output=True,
                 text=True,
                 timeout=5.0,
@@ -195,6 +198,7 @@ class WorkspaceDetector:
             result = subprocess.run(
                 ['git', 'rev-parse', '--git-dir'],
                 cwd=str(path),
+                env=workspace_git_env(),
                 capture_output=True,
                 text=True,
                 timeout=5.0,

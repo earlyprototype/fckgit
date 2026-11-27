@@ -6,6 +6,9 @@
 - Automatic commits report Git index lock contention and stop before pushing.
 - One-shot and watch commits include new files in the staged diff used for message generation.
 - CLI help, repository diagnostics and commits with a supplied message work without a Gemini key.
+- MCP repository discovery, diagnostics, Git operations and watchers discard inherited repository overrides.
+- Automatic staging stops if a pending file contains the configured Gemini key.
+- Watch mode includes new files when Git status hides them. One-shot mode exits with an error if the commit fails.
 
 ## [0.2.2] - 2026-01-06
 

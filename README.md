@@ -163,26 +163,26 @@ Your AI assistant can now:
 
 Tell your AI "blastoff" for auto mode, "blastoff in Silicon Valley mode" for professional commits, or just "Silicon Valley mode" for a single FAANG-tier commit. What could possibly go wrong?
 
-## Setup (Takes 30 Seconds)
+## Gemini setup
 
-**Get your free API key:** [Google AI Studio](https://makersuite.google.com/app/apikey) (or pick from one of your 5 existing accounts)
+Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey).
 
-**Drop it in a .env file:**
+Set the key before starting fckgit. In a POSIX shell, run
+
 ```bash
-cp .env.example .env
-# Edit .env and add your actual API key
+export GEMINI_API_KEY="your_key_here"
 ```
 
-Or just:
-```bash
-echo "GEMINI_API_KEY=your_key_here" > .env
+In PowerShell, run
+
+```powershell
+$env:GEMINI_API_KEY = "your_key_here"
 ```
 
-Or export it if you're fancy:
-```bash
-export GEMINI_API_KEY="your_key_here"  # iPad/Linux
-$env:GEMINI_API_KEY="your_key_here"    # Windows
-```
+You can also add `.env` to `.gitignore`, then create a `.env` file in the
+directory where you run `fckgit`. Set `GEMINI_API_KEY` in that file.
+An environment variable takes precedence. If Git already tracks the file,
+`git rm --cached -- .env` removes it from the index and keeps the local copy.
 
 ## Usage
 

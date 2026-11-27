@@ -8,10 +8,29 @@ Provides support for:
 - Nested repositories
 """
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+
+# Git's rev-parse --local-env-vars, plus the namespace and quarantine overrides.
+_REPOSITORY_ENV = {
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_CONFIG",
+    "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_DIR", "GIT_GRAFT_FILE",
+    "GIT_IMPLICIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX",
+    "GIT_QUARANTINE_PATH", "GIT_REPLACE_REF_BASE", "GIT_SHALLOW_FILE", "GIT_WORK_TREE",
+}
+
+
+def workspace_git_env():
+    """Let Git discover the requested repository from the child's cwd."""
+    return {
+        name: value for name, value in os.environ.items()
+        if name not in _REPOSITORY_ENV and not name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))
+    }
 
 
 @dataclass
@@ -51,6 +70,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
         result = subprocess.run(
             ['git', 'rev-parse', '--show-toplevel'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -66,6 +86,7 @@ def detect_git_repo_type(path: Path) -> Optional[GitRepoInfo]:
         result = subprocess.run(
             ['git', 'rev-parse', '--git-dir'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -123,6 +144,7 @@ def _is_worktree(path: Path) -> bool:
         result = subprocess.run(
             ['git', 'rev-parse', '--git-common-dir'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -139,6 +161,7 @@ def _is_worktree(path: Path) -> bool:
         result2 = subprocess.run(
             ['git', 'rev-parse', '--git-dir'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -171,6 +194,7 @@ def _is_submodule(path: Path) -> bool:
         result = subprocess.run(
             ['git', 'rev-parse', '--show-superproject-working-tree'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -200,6 +224,7 @@ def _is_bare_repository(path: Path) -> bool:
         result = subprocess.run(
             ['git', 'rev-parse', '--is-bare-repository'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -226,6 +251,7 @@ def _get_superproject_root(path: Path) -> Optional[Path]:
         result = subprocess.run(
             ['git', 'rev-parse', '--show-superproject-working-tree'],
             cwd=str(path),
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -251,6 +277,7 @@ def check_git_available() -> bool:
     try:
         result = subprocess.run(
             ['git', '--version'],
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,
@@ -271,6 +298,7 @@ def get_git_version() -> Optional[str]:
     try:
         result = subprocess.run(
             ['git', '--version'],
+            env=workspace_git_env(),
             capture_output=True,
             text=True,
             timeout=5.0,

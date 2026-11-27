@@ -9,7 +9,9 @@ from typing import Any, Optional
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
-from fckgit_gemini import GeminiConfigurationError, get_client
+from fckgit_gemini import (
+    GeminiConfigurationError, check_diff_for_key, check_files_before_staging, configured_key, get_client,
+)
 
 import psutil
 from mcp.server.models import InitializationOptions
@@ -19,7 +21,7 @@ import mcp.server.stdio
 
 # Import our new modules
 from .workspace import WorkspaceDetector, WorkspaceError, InvalidWorkspaceError
-from .git_utils import detect_git_repo_type
+from .git_utils import detect_git_repo_type, workspace_git_env
 from .platform_utils import get_subprocess_kwargs, check_subprocess_security
 from .logging_config import setup_logging, init_logger
 
@@ -108,6 +110,7 @@ async def run_git_command(
     # Get platform-specific subprocess kwargs
     kwargs = get_subprocess_kwargs(is_background=False, timeout=timeout)
     kwargs['cwd'] = str(cwd)
+    kwargs['env'] = workspace_git_env()
     
     # Log command execution (without sensitive data)
     cmd_str = ' '.join(cmd)
@@ -189,7 +192,7 @@ async def get_staged_diff(workspace: Path) -> str:
     return result.stdout if result.returncode == 0 else ""
 
 
-def generate_commit_message(diff: str) -> str:
+def generate_commit_message(diff: str, workspace: Optional[Path] = None) -> str:
     """Generate commit message using Gemini."""
     if not diff.strip():
         return "chore: Update files"
@@ -206,7 +209,8 @@ Changes:
 
 Output ONLY the commit message, nothing else."""
     
-    client = get_client()
+    check_diff_for_key(diff, workspace)
+    client = get_client(workspace)
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -217,7 +221,7 @@ Output ONLY the commit message, nothing else."""
         return f"chore: Update files (AI error: {str(e)})"
 
 
-def generate_silicon_valley_message(diff: str) -> str:
+def generate_silicon_valley_message(diff: str, workspace: Optional[Path] = None) -> str:
     """Generate a FAANG-tier professional commit message."""
     if not diff.strip():
         return "refactor: Optimize codebase architecture for improved maintainability"
@@ -243,7 +247,8 @@ Output format:
 
 Output ONLY the commit message, nothing else."""
     
-    client = get_client()
+    check_diff_for_key(diff, workspace)
+    client = get_client(workspace)
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -254,7 +259,7 @@ Output ONLY the commit message, nothing else."""
         return f"refactor: Implement strategic codebase improvements\n\nEnhanced system architecture to improve maintainability and operational excellence. This change aligns with industry best practices and positions the codebase for future scalability."
 
 
-def professionalize_message(casual_message: str) -> str:
+def professionalize_message(casual_message: str, workspace: Optional[Path] = None) -> str:
     """Transform a casual commit message into a FAANG-tier professional one."""
     if not casual_message.strip():
         return "refactor: Optimize codebase architecture"
@@ -278,7 +283,7 @@ Output format:
 
 Output ONLY the professional commit message, nothing else."""
     
-    client = get_client()
+    client = get_client(workspace)
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash-lite',
@@ -303,12 +308,25 @@ def cleanup_git_lock(workspace: Path):
     return False
 
 
+async def stage_all_changes(workspace: Path) -> Optional[str]:
+    try:
+        await asyncio.get_running_loop().run_in_executor(
+            None, check_files_before_staging, workspace, workspace_git_env()
+        )
+    except RuntimeError as exc:
+        return str(exc)
+    result = await run_git_command(["git", "add", "-A"], workspace)
+    if result.returncode:
+        return f"Failed to stage files: {result.stderr.strip()}"
+    return None
+
+
 async def commit_changes(workspace: Path, message: str, stage_all: bool = True) -> tuple[bool, str]:
     """Stage all changes and commit."""
     if stage_all:
-        result = await run_git_command(["git", "add", "-A"], workspace)
-        if result.returncode != 0:
-            return False, f"Failed to stage files: {result.stderr.strip()}"
+        error = await stage_all_changes(workspace)
+        if error:
+            return False, error
     
     result = await run_git_command(["git", "commit", "-m", message], workspace)
     
@@ -402,26 +420,18 @@ async def start_watch_mode(workspace: Path, cooldown: int = 30, faang_mode: bool
     
     # Start the process
     try:
-        # Use CREATE_NEW_PROCESS_GROUP on Windows or start_new_session on Unix
+        env = workspace_git_env()
+        key = configured_key(workspace)
+        if key:
+            env["GEMINI_API_KEY"] = key
         if sys.platform == 'win32':
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-            process = subprocess.Popen(
-                cmd,
-                cwd=repo_path,
-                creationflags=creationflags,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL
-            )
+            background = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW}
         else:
-            process = subprocess.Popen(
-                cmd,
-                cwd=repo_path,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL
-            )
+            background = {"start_new_session": True}
+        process = subprocess.Popen(
+            cmd, cwd=repo_path, env=env, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **background,
+        )
         
         # Store the process
         _watch_processes[repo_path] = process
@@ -669,6 +679,13 @@ async def handle_call_tool(
     name: str, arguments: dict[str, Any] | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool execution requests."""
+    try:
+        return await _call_tool(name, arguments)
+    except GeminiConfigurationError as exc:
+        return [types.TextContent(type="text", text=str(exc))]
+
+
+async def _call_tool(name: str, arguments: dict[str, Any] | None):
     
     if arguments is None:
         arguments = {}
@@ -686,10 +703,7 @@ async def handle_call_tool(
 
     if name in {"fckgit_generate_message", "fckgit_commit", "fckgit_silicon_valley",
                 "fckgit_professionalize", "fckgit_blastoff"}:
-        try:
-            get_client()
-        except GeminiConfigurationError as exc:
-            return [types.TextContent(type="text", text=str(exc))]
+        get_client(workspace)
 
     # Debug tool doesn't require git repo
     if name == "fckgit_debug":
@@ -799,7 +813,7 @@ async def handle_call_tool(
         if not diff.strip():
             return [types.TextContent(type="text", text="No changes to generate message for")]
         
-        message = generate_commit_message(diff)
+        message = generate_commit_message(diff, workspace)
         return [types.TextContent(type="text", text=f"Generated message: {message}")]
     
     elif name in ("fckgit_commit", "fckgit_silicon_valley"):
@@ -809,9 +823,9 @@ async def handle_call_tool(
         # Get diff for message generation
         if stage_all:
             # Stage first so we can see untracked files
-            result = await run_git_command(["git", "add", "-A"], workspace)
-            if result.returncode:
-                return [types.TextContent(type="text", text=f"Failed to stage files: {result.stderr.strip()}")]
+            error = await stage_all_changes(workspace)
+            if error:
+                return [types.TextContent(type="text", text=error)]
         
         diff = await get_staged_diff(workspace)
         
@@ -820,9 +834,9 @@ async def handle_call_tool(
         
         # Generate message
         if name == "fckgit_silicon_valley":
-            message = generate_silicon_valley_message(diff)
+            message = generate_silicon_valley_message(diff, workspace)
         else:
-            message = generate_commit_message(diff)
+            message = generate_commit_message(diff, workspace)
         
         # Commit
         success, result_msg = await commit_changes(workspace, message, stage_all=False)  # Already staged
@@ -905,7 +919,7 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text="Error: message is required")]
         
         # Transform to professional
-        professional_message = professionalize_message(casual_message)
+        professional_message = professionalize_message(casual_message, workspace)
         
         result = f"CASUAL MESSAGE:\n{casual_message}\n\n"
         result += f"PROFESSIONAL VERSION:\n{professional_message}\n\n"
